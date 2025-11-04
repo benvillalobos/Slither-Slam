@@ -153,9 +153,10 @@ files:
 
       \  \r
 
-      \  // Draw score banner at the top (always visible in series mode)\r
+      \  // Draw score banner at the top (always visible in series mode or
+      training mode)\r
 
-      \  if (seriesState.active) {\r
+      \  if (seriesState.active || GAME_CONFIG.trainingMode) {\r
 
       \    drawScoreBanner();\r
 
@@ -167,7 +168,7 @@ files:
 
       \  push();\r
 
-      \  if (seriesState.active) {\r
+      \  if (seriesState.active || GAME_CONFIG.trainingMode) {\r
 
       \    translate(0, SCORE_BANNER_HEIGHT);\r
 
@@ -1706,39 +1707,33 @@ files:
 
       \  \r
 
-      \  // Only create enemy when not in training mode\r
+      \  // Always create enemy snake (even in training mode)\r
 
-      \  if (!GAME_CONFIG.trainingMode) {\r
+      \  enemy = new Snake({\r
 
-      \    enemy = new Snake({\r
+      \    ...ENEMY_CONFIG,\r
 
-      \      ...ENEMY_CONFIG,\r
+      \    stepMs: scaleSpeed(SPEED_CONFIG.enemyBaseMs, scale)\r
 
-      \      stepMs: scaleSpeed(SPEED_CONFIG.enemyBaseMs, scale)\r
+      \  });\r
 
-      \    });\r
+      \  \r
 
-      \    \r
+      \  // Initialize or continue series when not in training mode\r
 
-      \    // Initialize or continue series when not in training mode\r
+      \  if (!GAME_CONFIG.trainingMode && GAME_CONFIG.series.enabled) {\r
 
-      \    if (GAME_CONFIG.series.enabled) {\r
+      \    if (!continueSeriesMode) {\r
 
-      \      if (!continueSeriesMode) {\r
+      \      // Start fresh series\r
 
-      \        // Start fresh series\r
-
-      \        resetSeriesState();\r
-
-      \      }\r
-
-      \      seriesState.active = true;\r
+      \      resetSeriesState();\r
 
       \    }\r
 
-      \  } else {\r
+      \    seriesState.active = true;\r
 
-      \    enemy = undefined; // Ensure enemy is undefined in training mode\r
+      \  } else if (GAME_CONFIG.trainingMode) {\r
 
       \    seriesState.active = false;\r
 
