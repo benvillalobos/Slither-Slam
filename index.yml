@@ -7,5 +7,3497 @@ contacts:
   - displayName: Ben Villalobos
     pictureUrl: https://avatars.githubusercontent.com/u/4691428?v=4
     homePageUrl: https://github.com/benvillalobos
+files:
+  - path: course1/game.js
+    content: "// ------ Grid & Canvas ------\r
+
+      let canvasW = GRID.cols * GRID.cell;\r
+
+      let canvasH = GRID.rows * GRID.cell;\r
+
+      const SLIDER_HEIGHT = 40;\r
+
+      const SCORE_BANNER_HEIGHT = 30;\r
+
+      const SLIDER_LEFT_OFFSET = 80; // Space for \"Speed: \" text\r
+
+      const TOTAL_CANVAS_HEIGHT = canvasH + SLIDER_HEIGHT +
+      SCORE_BANNER_HEIGHT;\r
+
+      \r
+
+      // ------ Series State ------\r
+
+      let seriesState = {\r
+
+      \  active: false,                // Whether a series is active\r
+
+      \  playerWins: 0,                // Number of wins for player\r
+
+      \  enemyWins: 0,                 // Number of wins for enemy\r
+
+      \  gamesPlayed: 0,               // Number of games played in series\r
+
+      \  seriesWinner: null,           // Overall series winner\r
+
+      \  seriesOver: false             // Whether the series is complete\r
+
+      };\r
+
+      \r
+
+      // ------ Game State ------\r
+
+      let player, enemy;\r
+
+      let food = { x: 0, y: 0 };\r
+
+      let allFood = []; // Array of all foods, foods[0] should always be food\r
+
+      let winner = null;\r
+
+      let gameOver = false;\r
+
+      let gamePaused = false;\r
+
+      let preRoundScreen = true; // Show pre-round instructions screen\r
+
+      let score = 0; // In-memory score\r
+
+      \r
+
+      // ------ In-canvas Speed Slider State ------\r
+
+      let sliderValue = 0; // 0-100, 0 is leftmost (1x speed), 100 is rightmost
+      (fastest)\r
+
+      let isDraggingSlider = false;\r
+
+      \r
+
+      // ------ Frame History System ------\r
+
+      let frameHistory = [];\r
+
+      let currentFrameIndex = -1\r
+
+      let inReplayMode = false;\r
+
+      let replayBannerAtTop = false;\r
+
+      \r
+
+      // Global game object accessible to AIs\r
+
+      let game = {\r
+
+      \  food: { x: 0, y: 0 },\r
+
+      \  foods: [], // Array of all foods\r
+
+      \  player: null,\r
+
+      \  enemy: null,\r
+
+      \  GRID: GRID\r
+
+      };\r
+
+      window.game = game;\r
+
+      \r
+
+      const Direction = {\r
+
+      \  UP: 'UP',\r
+
+      \  DOWN: 'DOWN', \r
+
+      \  LEFT: 'LEFT',\r
+
+      \  RIGHT: 'RIGHT'\r
+
+      };\r
+
+      window.Direction = Direction;\r
+
+      \r
+
+      // ------ p5: setup & draw ------\r
+
+      function setup() {\r
+
+      \  const c = createCanvas(canvasW, TOTAL_CANVAS_HEIGHT);\r
+
+      \  c.parent('p5-holder');\r
+
+      \  pixelDensity(1);\r
+
+      \r
+
+      \r
+
+      \  \r
+
+      \  // Start the game (which will initialize series state if needed)\r
+
+      \  startNewGame();\r
+
+      }\r
+
+      \r
+
+      function draw() {\r
+
+      \  background('#0b0b0b');\r
+
+      \  \r
+
+      \  // Draw score banner at the top (always visible in series mode)\r
+
+      \  if (seriesState.active) {\r
+
+      \    drawScoreBanner();\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Translate canvas for all game elements below the score banner\r
+
+      \  push();\r
+
+      \  if (seriesState.active) {\r
+
+      \    translate(0, SCORE_BANNER_HEIGHT);\r
+
+      \  }\r
+
+      \  \r
+
+      \  drawGrid();\r
+
+      \  \r
+
+      \  // Draw speed slider at the bottom (always visible)\r
+
+      \  drawSpeedSlider();\r
+
+      \r
+
+      \  // If in replay mode, show frame replay instead of normal game\r
+
+      \  if (inReplayMode) {\r
+
+      \    const currentFrame = getCurrentFrame();\r
+
+      \    if (currentFrame) {\r
+
+      \      drawReplayFrame(currentFrame);\r
+
+      \    }\r
+
+      \    pop(); // End translation before drawing controls\r
+
+      \    drawReplayControls();\r
+
+      \    return;\r
+
+      \  }\r
+
+      \  \r
+
+      \  // If pre-round screen is active, show it and wait for player input\r
+
+      \  if (preRoundScreen) {\r
+
+      \    drawPreRoundScreen();\r
+
+      \    return;\r
+
+      \  }\r
+
+      \r
+
+      \  // If game is paused, draw everything frozen and show pause overlay\r
+
+      \  if (gamePaused) {\r
+
+      \    drawFood(allFood);\r
+
+      \    player.draw(this, GRID.cell);\r
+
+      \    if (enemy) enemy.draw(this, GRID.cell);\r
+
+      \    drawPauseOverlay();\r
+
+      \    return;\r
+
+      \  }\r
+
+      \r
+
+      \  // If game over, draw frozen snakes + winner blinking + option to enter
+      replay\r
+
+      \  if (gameOver) {\r
+
+      \    drawFood(allFood);\r
+
+      \    drawGameOver();\r
+
+      \    return;\r
+
+      \  }\r
+
+      \r
+
+      \  // Update global game object before running AIs\r
+
+      \  game.food = food;\r
+
+      \  game.foods = allFood;\r
+
+      \  game.player = player;\r
+
+      \  game.enemy = enemy;\r
+
+      \r
+
+      \  // Run AIs and capture their direction decisions\r
+
+      \  if (player.alive) {\r
+
+      \    const playerDirection = window.playerAI(player);\r
+
+      \    if (playerDirection) {\r
+
+      \      player.setDirection(playerDirection);\r
+
+      \    }\r
+
+      \  }\r
+
+      \  if (enemy && enemy.alive) {\r
+
+      \    const enemyDirection = window.enemyAI(enemy);\r
+
+      \    if (enemyDirection) {\r
+
+      \      enemy.setDirection(enemyDirection);\r
+
+      \    }\r
+
+      \  }\r
+
+      \r
+
+      \  // Advance snakes\r
+
+      \  const now = millis();\r
+
+      \  const gameContext = { food, foods: allFood, enemy, player, GRID };\r
+
+      \  const pRes = player.moveIfReady(now, gameContext);\r
+
+      \  const eRes = enemy ? enemy.moveIfReady(now, gameContext) : { moved:
+      false, ateFood: false };\r
+
+      \r
+
+      \  // Capture frame when either snake moves\r
+
+      \  if (pRes.moved || (enemy && eRes.moved)) {\r
+
+      \    captureGameState();\r
+
+      \  }\r
+
+      \r
+
+      \  // Check collisions after both snakes have moved\r
+
+      \  if (pRes.moved) checkCollisions(player, enemy, GRID);\r
+
+      \  if (enemy && eRes.moved) checkCollisions(enemy, player, GRID);\r
+
+      \r
+
+      \  // Food handling & scoring\r
+
+      \  if (pRes.ateFood || (enemy && eRes.ateFood)) {\r
+
+      \    if (pRes.ateFood) {\r
+
+      \      // Only increase score for regular food, not poison\r
+
+      \      if (!pRes.atePoison) {\r
+
+      \        bumpScore(1);\r
+
+      \      }\r
+
+      \      moveEatenFood(pRes.eatenFood);\r
+
+      \    }\r
+
+      \    if (enemy && eRes.ateFood) {\r
+
+      \      moveEatenFood(eRes.eatenFood);\r
+
+      \    }\r
+
+      \  }\r
+
+      \r
+
+      \  drawFood(allFood);\r
+
+      \  player.draw(this, GRID.cell);\r
+
+      \  if (enemy) enemy.draw(this, GRID.cell);\r
+
+      \r
+
+      \  // Check end states\r
+
+      \  if (!player.alive || (enemy && !enemy.alive)) {\r
+
+      \    gameOver = true;\r
+
+      \    if (enemy) {\r
+
+      \      if (player.alive && !enemy.alive) winner = player;\r
+
+      \      else if (enemy.alive && !player.alive) winner = enemy;\r
+
+      \      else winner = null;\r
+
+      \      \r
+
+      \      // Update series state if series is active\r
+
+      \      if (seriesState.active) {\r
+
+      \        seriesState.gamesPlayed++;\r
+
+      \        \r
+
+      \        if (winner === player) {\r
+
+      \          seriesState.playerWins++;\r
+
+      \        } else if (winner === enemy) {\r
+
+      \          seriesState.enemyWins++;\r
+
+      \        }\r
+
+      \        \r
+
+      \        // Check if series is complete\r
+
+      \        if (seriesState.playerWins >= GAME_CONFIG.series.winsToWin || \r
+
+      \            seriesState.enemyWins >= GAME_CONFIG.series.winsToWin) {\r
+
+      \          seriesState.seriesOver = true;\r
+
+      \          if (seriesState.playerWins > seriesState.enemyWins) {\r
+
+      \            seriesState.seriesWinner = player;\r
+
+      \          } else if (seriesState.enemyWins > seriesState.playerWins) {\r
+
+      \            seriesState.seriesWinner = enemy;\r
+
+      \          } else {\r
+
+      \            seriesState.seriesWinner = null; // Tie\r
+
+      \          }\r
+
+      \        }\r
+
+      \      }\r
+
+      \    } else {\r
+
+      \      // In training mode, there's no winner when game is over\r
+
+      \      winner = null;\r
+
+      \    }\r
+
+      \  }\r
+
+      \  \r
+
+      \  pop(); // End translation\r
+
+      }\r
+
+      \r
+
+      // ------ World utilities ------\r
+
+      function checkCollisions(snake, otherSnake, GRID) {\r
+
+      \  if (!snake.alive) return;\r
+
+      \  const head = snake.head();\r
+
+      \  \r
+
+      \  // Wall collision: out of bounds -> dead\r
+
+      \  if (head.x < 0 || head.y < 0 || head.x >= GRID.cols || head.y >=
+      GRID.rows) {\r
+
+      \    snake.alive = false;\r
+
+      \    snake.deathCause = 'wall';\r
+
+      \    return;\r
+
+      \  }\r
+
+      \r
+
+      \  // Self collision: head hits own body (excluding head)\r
+
+      \  const collides = (cells, pt) => cells.some(c => c.x === pt.x && c.y ===
+      pt.y);\r
+
+      \  if (collides(snake.body.slice(1), head)) {\r
+
+      \    snake.alive = false;\r
+
+      \    snake.deathCause = 'self';\r
+
+      \    return;\r
+
+      \  }\r
+
+      \r
+
+      \  // Other snake collision: head hits other snake's body\r
+
+      \  if (otherSnake?.alive && collides(otherSnake.body, head)) {\r
+
+      \    snake.alive = false;\r
+
+      \    snake.deathCause = 'opponent';\r
+
+      \    return;\r
+
+      \  }\r
+
+      \r
+
+      \  // Head-to-head collision: both snakes in same cell\r
+
+      \  if (otherSnake?.alive) {\r
+
+      \    const otherHead = otherSnake.head();\r
+
+      \    if (head.x === otherHead.x && head.y === otherHead.y) {\r
+
+      \      snake.alive = false;\r
+
+      \      snake.deathCause = 'head-to-head';\r
+
+      \      otherSnake.alive = false;\r
+
+      \      otherSnake.deathCause = 'head-to-head';\r
+
+      \      return;\r
+
+      \    }\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function initializeFoods() {\r
+
+      \  const occupied = new Set();\r
+
+      \  const add = (c) => occupied.add(`${c.x},${c.y}`);\r
+
+      \  player.body.forEach(add);\r
+
+      \  if (enemy) enemy.body.forEach(add);\r
+
+      \r
+
+      \  allFood = []; // Clear existing foods\r
+
+      \  \r
+
+      \  // Add regular food items\r
+
+      \  for (let i = 0; i < FOOD_CONFIG.foodCount; i++) {\r
+
+      \    let x, y, tries = 0;\r
+
+      \    do {\r
+
+      \      x = Math.floor(Math.random() * GRID.cols);\r
+
+      \      y = Math.floor(Math.random() * GRID.rows);\r
+
+      \      tries++;\r
+
+      \      if (tries > 500) { \r
+
+      \        // If we can't find a spot, just place it at (0,0) and break\r
+
+      \        allFood.push({x: 0, y: 0, type: 'food'});\r
+
+      \        break;\r
+
+      \      }\r
+
+      \    } while (occupied.has(`${x},${y}`));\r
+
+      \    \r
+
+      \    if (tries <= 500) {\r
+
+      \      const newFood = { x, y, type: 'food' };\r
+
+      \      allFood.push(newFood);\r
+
+      \      occupied.add(`${x},${y}`); // Mark this position as occupied for
+      next food\r
+
+      \    }\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Add poison items\r
+
+      \  for (let i = 0; i < FOOD_CONFIG.poisonCount; i++) {\r
+
+      \    let x, y, tries = 0;\r
+
+      \    do {\r
+
+      \      x = Math.floor(Math.random() * GRID.cols);\r
+
+      \      y = Math.floor(Math.random() * GRID.rows);\r
+
+      \      tries++;\r
+
+      \      if (tries > 500) { \r
+
+      \        // If we can't find a spot, just place it at (0,0) and break\r
+
+      \        allFood.push({x: 0, y: 0, type: 'poison'});\r
+
+      \        break;\r
+
+      \      }\r
+
+      \    } while (occupied.has(`${x},${y}`));\r
+
+      \    \r
+
+      \    if (tries <= 500) {\r
+
+      \      const newFood = { x, y, type: 'poison' };\r
+
+      \      allFood.push(newFood);\r
+
+      \      occupied.add(`${x},${y}`); // Mark this position as occupied for
+      next food\r
+
+      \    }\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Set the first food as the primary food for backward compatibility\r
+
+      \  if (allFood.length > 0) {\r
+
+      \    food = allFood[0];\r
+
+      \  } else {\r
+
+      \    food = { x: 0, y: 0, type: 'food' };\r
+
+      \    allFood = [food];\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function moveEatenFood(eatenFood) {\r
+
+      \  const occupied = new Set();\r
+
+      \  const add = (c) => occupied.add(`${c.x},${c.y}`);\r
+
+      \  player.body.forEach(add);\r
+
+      \  if (enemy) enemy.body.forEach(add);\r
+
+      \  \r
+
+      \  // Add all other foods to occupied positions\r
+
+      \  allFood.forEach(f => {\r
+
+      \    if (f.x !== eatenFood.x || f.y !== eatenFood.y) {\r
+
+      \      occupied.add(`${f.x},${f.y}`);\r
+
+      \    }\r
+
+      \  });\r
+
+      \r
+
+      \  let x, y, tries = 0;\r
+
+      \  do {\r
+
+      \    x = Math.floor(Math.random() * GRID.cols);\r
+
+      \    y = Math.floor(Math.random() * GRID.rows);\r
+
+      \    tries++;\r
+
+      \    if (tries > 500) { \r
+
+      \      // If we can't find a spot, just place it at (0,0)\r
+
+      \      eatenFood.x = 0;\r
+
+      \      eatenFood.y = 0;\r
+
+      \      return;\r
+
+      \    }\r
+
+      \  } while (occupied.has(`${x},${y}`));\r
+
+      \  \r
+
+      \  eatenFood.x = x;\r
+
+      \  eatenFood.y = y;\r
+
+      }\r
+
+      \r
+
+      function drawFood(f) {\r
+
+      \  // If f is an array, draw all foods\r
+
+      \  if (Array.isArray(f)) {\r
+
+      \    f.forEach(singleFood => {\r
+
+      \      push();\r
+
+      \      noStroke();\r
+
+      \      // Use different colors based on food type\r
+
+      \      const foodColor = singleFood.type === 'poison' \r
+
+      \        ? FOOD_CONFIG.poisonColor \r
+
+      \        : FOOD_CONFIG.foodColor;\r
+
+      \      fill(foodColor);\r
+
+      \      const s = GRID.cell;\r
+
+      \      rect(singleFood.x * s, singleFood.y * s, s, s, 4);\r
+
+      \      pop();\r
+
+      \    });\r
+
+      \  } else {\r
+
+      \    // Single food (backward compatibility)\r
+
+      \    push();\r
+
+      \    noStroke();\r
+
+      \    // Use food color as default for backward compatibility\r
+
+      \    const foodColor = f.type === 'poison' \r
+
+      \      ? FOOD_CONFIG.poisonColor \r
+
+      \      : FOOD_CONFIG.foodColor;\r
+
+      \    fill(foodColor);\r
+
+      \    const s = GRID.cell;\r
+
+      \    rect(f.x * s, f.y * s, s, s, 4);\r
+
+      \    pop();\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      // ------ Frame History System ------\r
+
+      function captureGameState() {\r
+
+      \  const state = {\r
+
+      \    player: {\r
+
+      \      body: [...player.body.map(seg => ({...seg}))],\r
+
+      \      alive: player.alive,\r
+
+      \      deathCause: player.deathCause,\r
+
+      \      color: player.color\r
+
+      \    },\r
+
+      \    enemy: enemy ? {\r
+
+      \      body: [...enemy.body.map(seg => ({...seg}))],\r
+
+      \      alive: enemy.alive,\r
+
+      \      deathCause: enemy.deathCause,\r
+
+      \      color: enemy.color\r
+
+      \    } : null,\r
+
+      \    food: {...food},\r
+
+      \    winner: winner,\r
+
+      \    gameOver: gameOver,\r
+
+      \    score: score.toString()\r
+
+      \  };\r
+
+      \  \r
+
+      \  frameHistory.push(state);\r
+
+      \  \r
+
+      \  // Keep only last 5 frames\r
+
+      \  if (frameHistory.length > 5) {\r
+
+      \    frameHistory.shift();\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function enterReplayMode() {\r
+
+      \  if (frameHistory.length === 0) return;\r
+
+      \  inReplayMode = true;\r
+
+      \  currentFrameIndex = frameHistory.length - 1;\r
+
+      \  replayBannerAtTop = false;\r
+
+      \  noLoop(); // Stop the game loop\r
+
+      }\r
+
+      \r
+
+      function exitReplayMode() {\r
+
+      \  inReplayMode = false;\r
+
+      \  currentFrameIndex = -1;\r
+
+      \  if (!gamePaused) {\r
+
+      \    loop(); // Resume game loop unless paused (even if game over for UI
+      responsiveness)\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function stepFrame(direction) {\r
+
+      \  if (!inReplayMode || frameHistory.length === 0) return;\r
+
+      \  \r
+
+      \  if (direction === 'forward') {\r
+
+      \    currentFrameIndex = Math.min(currentFrameIndex + 1,
+      frameHistory.length - 1);\r
+
+      \  } else if (direction === 'backward') {\r
+
+      \    currentFrameIndex = Math.max(currentFrameIndex - 1, 0);\r
+
+      \  }\r
+
+      \  \r
+
+      \  redraw();\r
+
+      }\r
+
+      \r
+
+      function getCurrentFrame() {\r
+
+      \  if (!inReplayMode || currentFrameIndex < 0 || currentFrameIndex >=
+      frameHistory.length) {\r
+
+      \    return null;\r
+
+      \  }\r
+
+      \  return frameHistory[currentFrameIndex];\r
+
+      }\r
+
+      \r
+
+      function drawReplayFrame(frame) {\r
+
+      \  if (!frame) return;\r
+
+      \  \r
+
+      \  drawFood(frame.food);\r
+
+      \  \r
+
+      \  push();\r
+
+      \  noStroke();\r
+
+      \  fill(frame.player.color);\r
+
+      \  for (let i = 0; i < frame.player.body.length; i++) {\r
+
+      \    const b = frame.player.body[i];\r
+
+      \    const r = i === 0 ? 6 : 3; // roundness hint: bigger on head\r
+
+      \    rect(b.x * GRID.cell, b.y * GRID.cell, GRID.cell, GRID.cell, r);\r
+
+      \  }\r
+
+      \  pop();\r
+
+      \  \r
+
+      \  if (frame.enemy) {\r
+
+      \    push();\r
+
+      \    noStroke();\r
+
+      \    fill(frame.enemy.color);\r
+
+      \    for (let i = 0; i < frame.enemy.body.length; i++) {\r
+
+      \      const b = frame.enemy.body[i];\r
+
+      \      const r = i === 0 ? 6 : 3; // roundness hint: bigger on head\r
+
+      \      rect(b.x * GRID.cell, b.y * GRID.cell, GRID.cell, GRID.cell, r);\r
+
+      \    }\r
+
+      \    pop();\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function drawReplayControls() {\r
+
+      \  push();\r
+
+      \  noStroke();\r
+
+      \  fill(0, 180); // Semi-transparent overlay\r
+
+      \  const bannerHeight = 80;\r
+
+      \  const bannerY = replayBannerAtTop ? 0 : height - bannerHeight;\r
+
+      \  rect(0, bannerY, width, bannerHeight);\r
+
+      \  \r
+
+      \  fill(255, 220);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  textSize(14);\r
+
+      \  text(`Frame Replay Mode - Frame ${currentFrameIndex + 1} of
+      ${frameHistory.length}`, width/2, bannerY + 20);\r
+
+      \  textSize(12);\r
+
+      \  text('← → Arrow keys to navigate frames • F to exit replay • R to
+      restart', width/2, bannerY + 45);\r
+
+      \  text('↑ ↓ Move this banner • (Pause disabled in replay mode)', width/2,
+      bannerY + 65);\r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function drawGrid() {\r
+
+      \  push();\r
+
+      \  stroke(255, 20);\r
+
+      \  strokeWeight(1);\r
+
+      \  for (let x = 1; x < GRID.cols; x++) line(x * GRID.cell, 0, x *
+      GRID.cell, canvasH);\r
+
+      \  for (let y = 1; y < GRID.rows; y++) line(0, y * GRID.cell, width, y *
+      GRID.cell);\r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function drawScoreBanner() {\r
+
+      \  push();\r
+
+      \  // Draw background for score banner\r
+
+      \  noStroke();\r
+
+      \  fill(20, 20, 20);\r
+
+      \  rect(0, 0, canvasW, SCORE_BANNER_HEIGHT);\r
+
+      \  \r
+
+      \  // Draw separator line\r
+
+      \  stroke(255, 50);\r
+
+      \  strokeWeight(1);\r
+
+      \  line(0, SCORE_BANNER_HEIGHT, canvasW, SCORE_BANNER_HEIGHT);\r
+
+      \  \r
+
+      \  // Calculate layout\r
+
+      \  const winsToWin = GAME_CONFIG.series.winsToWin;\r
+
+      \  const squareSize = 16;\r
+
+      \  const trophySize = 16;\r
+
+      \  const trophySpacing = 18;\r
+
+      \  const colorSquareSpacing = 8;\r
+
+      \  const centerTrophySpacing = 10;\r
+
+      \  const fontSize = 16;\r
+
+      \  const textYOffset = 2;\r
+
+      \  \r
+
+      \  // Center trophy\r
+
+      \  noStroke();\r
+
+      \  fill(255, 200);\r
+
+      \  textSize(trophySize);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  text('🏆', canvasW / 2, SCORE_BANNER_HEIGHT / 2);\r
+
+      \  \r
+
+      \  // Player side (left) - SnakeBot\r
+
+      \  const playerSideX = canvasW / 2 - centerTrophySpacing - trophySize;\r
+
+      \  \r
+
+      \  // Draw player color square\r
+
+      \  fill(PLAYER_CONFIG.color);\r
+
+      \  noStroke();\r
+
+      \  rect(playerSideX - squareSize - colorSquareSpacing - (winsToWin *
+      trophySpacing) + 6, \r
+
+      \       SCORE_BANNER_HEIGHT / 2 - squareSize / 2, \r
+
+      \       squareSize, squareSize, 2);\r
+
+      \  \r
+
+      \  // Draw player name\r
+
+      \  fill(200, 200, 200);\r
+
+      \  textSize(fontSize);\r
+
+      \  textAlign(RIGHT, CENTER);\r
+
+      \  text(PLAYER_CONFIG.id, \r
+
+      \       playerSideX - squareSize - colorSquareSpacing - (winsToWin *
+      trophySpacing), \r
+
+      \       SCORE_BANNER_HEIGHT / 2 + textYOffset);\r
+
+      \  \r
+
+      \  // Draw player trophies (fill from left to right)\r
+
+      \  textSize(trophySize);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  for (let i = 0; i < winsToWin; i++) {\r
+
+      \    const x = playerSideX - (winsToWin - 1 - i) * trophySpacing + 8;\r
+
+      \    if (i < seriesState.playerWins) {\r
+
+      \      fill(0, 255, 0); // Green checkmark\r
+
+      \      text('✅', x, SCORE_BANNER_HEIGHT / 2);\r
+
+      \    } else {\r
+
+      \      fill(100, 100, 100); // Gray square\r
+
+      \      text('⬛', x, SCORE_BANNER_HEIGHT / 2);\r
+
+      \    }\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Enemy side (right) - Serpent Supreme\r
+
+      \  const enemySideX = canvasW / 2 + centerTrophySpacing + trophySize -
+      8;\r
+
+      \  \r
+
+      \  // Draw enemy trophies (fill from right to left)\r
+
+      \  textSize(trophySize);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  for (let i = 0; i < winsToWin; i++) {\r
+
+      \    const x = enemySideX + i * trophySpacing;\r
+
+      \    // Check from the right: if (winsToWin - 1 - i) < enemyWins, then
+      this trophy should be green\r
+
+      \    if ((winsToWin - 1 - i) < seriesState.enemyWins) {\r
+
+      \      fill(0, 255, 0); // Green checkmark\r
+
+      \      text('✅', x, SCORE_BANNER_HEIGHT / 2);\r
+
+      \    } else {\r
+
+      \      fill(100, 100, 100); // Gray square\r
+
+      \      text('⬛', x, SCORE_BANNER_HEIGHT / 2);\r
+
+      \    }\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Draw enemy name\r
+
+      \  fill(200, 200, 200);\r
+
+      \  textSize(fontSize);\r
+
+      \  textAlign(LEFT, CENTER);\r
+
+      \  text('Opponent', \r
+
+      \       enemySideX + (winsToWin * trophySpacing) + colorSquareSpacing +
+      squareSize + 5, \r
+
+      \       SCORE_BANNER_HEIGHT / 2 + textYOffset);\r
+
+      \  \r
+
+      \  // Draw enemy color square\r
+
+      \  fill(ENEMY_CONFIG.color);\r
+
+      \  noStroke();\r
+
+      \  rect(enemySideX + (winsToWin * trophySpacing) + colorSquareSpacing, \r
+
+      \       SCORE_BANNER_HEIGHT / 2 - squareSize / 2, \r
+
+      \       squareSize, squareSize, 2);\r
+
+      \  \r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function drawSpeedSlider() {\r
+
+      \  const sliderY = canvasH;\r
+
+      \  const sliderMargin = 15;\r
+
+      \  const sliderBarWidth = canvasW - SLIDER_LEFT_OFFSET - sliderMargin;\r
+
+      \  const sliderBarHeight = 8;\r
+
+      \  const sliderBarX = SLIDER_LEFT_OFFSET;\r
+
+      \  const sliderBarY = sliderY + (SLIDER_HEIGHT - sliderBarHeight) / 2;\r
+
+      \  \r
+
+      \  // Draw background for slider area\r
+
+      \  push();\r
+
+      \  noStroke();\r
+
+      \  fill(30, 30, 30);\r
+
+      \  rect(0, sliderY, canvasW, SLIDER_HEIGHT);\r
+
+      \  \r
+
+      \  // Draw slider bar\r
+
+      \  fill(80, 80, 80);\r
+
+      \  rect(sliderBarX, sliderBarY, sliderBarWidth, sliderBarHeight, 3);\r
+
+      \  \r
+
+      \  // Calculate cursor position (0-100 maps to slider bar width)\r
+
+      \  const cursorX = sliderBarX + (sliderValue / 100) * sliderBarWidth;\r
+
+      \  const cursorWidth = 18;\r
+
+      \  const cursorHeight = 24;\r
+
+      \  const cursorY = sliderY + (SLIDER_HEIGHT - cursorHeight) / 2;\r
+
+      \  \r
+
+      \  // Draw cursor\r
+
+      \  fill(255, 255, 255);\r
+
+      \  stroke(100, 100, 100);\r
+
+      \  strokeWeight(1);\r
+
+      \  rect(cursorX - cursorWidth / 2, cursorY, cursorWidth, cursorHeight,
+      3);\r
+
+      \  \r
+
+      \  // Draw \"Speed: \" label before slider\r
+
+      \  textAlign(LEFT, CENTER);\r
+
+      \  textSize(20);\r
+
+      \  noStroke();\r
+
+      \  fill(200, 200, 200);\r
+
+      \  text(' Speed', 2, sliderY + SLIDER_HEIGHT / 2);\r
+
+      \  \r
+
+      \  // Draw speed icons\r
+
+      \  textSize(14);\r
+
+      \  fill(150, 150, 150);\r
+
+      \  \r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function drawGameOver() {\r
+
+      \  const blinkOn = floor(millis() / 400) % 2 === 0;\r
+
+      \r
+
+      \  // Draw the snakes\r
+
+      \  if (!player.alive || winner === player) {\r
+
+      \    if (winner === player) {\r
+
+      \      if (blinkOn) player.draw(this, GRID.cell);\r
+
+      \    } else {\r
+
+      \      player.draw(this, GRID.cell);\r
+
+      \    }\r
+
+      \  }\r
+
+      \  if (enemy && (!enemy.alive || winner === enemy)) {\r
+
+      \    if (winner === enemy) {\r
+
+      \      if (blinkOn) enemy.draw(this, GRID.cell);\r
+
+      \    } else {\r
+
+      \      enemy.draw(this, GRID.cell);\r
+
+      \    }\r
+
+      \  }\r
+
+      \r
+
+      \  push();\r
+
+      \  noStroke();\r
+
+      \  fill(255, 220);\r
+
+      \  \r
+
+      \  // Make the overlay taller for series information\r
+
+      \  const overlayHeight = seriesState.active ? 200 : 120;\r
+
+      \  rect(0, height/2 - overlayHeight/2, width, overlayHeight);\r
+
+      \  \r
+
+      \  fill(0);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  textSize(22); // Larger text for winner\r
+
+      \r
+
+      \  let line1 = ''; // Winner announcement\r
+
+      \  let line2 = ''; // Series score\r
+
+      \  let line3 = ''; // Death message\r
+
+      \  let line4 = ''; // Series winner (if applicable)\r
+
+      \  let instructionsText = '';\r
+
+      \  \r
+
+      \  // Set game outcome text\r
+
+      \  if (GAME_CONFIG.trainingMode) {\r
+
+      \    line1 = 'TRAINING COMPLETE';\r
+
+      \    line3 = 'Continue to the next lesson when you\\'re ready.';\r
+
+      \  } else if (!player.alive && !enemy.alive) {\r
+
+      \    if (player.deathCause === 'head-to-head' && enemy.deathCause ===
+      'head-to-head') {\r
+
+      \      line1 = 'HEAD-TO-HEAD COLLISION!';\r
+
+      \      line3 = 'Both players crashed!';\r
+
+      \    } else {\r
+
+      \      line1 = 'BOTH PLAYERS CRASHED!';\r
+
+      \    }\r
+
+      \  } else if (winner === player) {\r
+
+      \    line1 = `${PLAYER_CONFIG.id.toUpperCase()} WINS!`;\r
+
+      \    line3 = `${ENEMY_CONFIG.id} ${getDeathMessage(enemy.deathCause)}`;\r
+
+      \  } else if (winner === enemy) {\r
+
+      \    line1 = `${ENEMY_CONFIG.id.toUpperCase()} WINS!`;\r
+
+      \    line3 = `${PLAYER_CONFIG.id}
+      ${getDeathMessage(player.deathCause)}`;\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Set instructions text\r
+
+      \  if (GAME_CONFIG.trainingMode) {\r
+
+      \    instructionsText = 'R: Restart';\r
+
+      \  } else if (seriesState.active) {\r
+
+      \    if (seriesState.seriesOver) {\r
+
+      \      instructionsText = 'R: Start New Series';\r
+
+      \    } else {\r
+
+      \      instructionsText = '\\nENTER: Continue\\nR: Reset';\r
+
+      \    }\r
+
+      \  } else {\r
+
+      \    instructionsText = 'R: Restart';\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Add replay option if available\r
+
+      \  if (frameHistory.length > 0) {\r
+
+      \    instructionsText += '\\nF: Replay Mode';\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Add series information if active\r
+
+      \  if (seriesState.active) {\r
+
+      \    // Series score in new format\r
+
+      \    line2 = `${PLAYER_CONFIG.id}: ${seriesState.playerWins} -
+      ${seriesState.enemyWins} ${ENEMY_CONFIG.id}`;\r
+
+      \    \r
+
+      \    // If series is over, show overall winner\r
+
+      \    if (seriesState.seriesOver) {\r
+
+      \      if (seriesState.seriesWinner === player) {\r
+
+      \        line4 = `${PLAYER_CONFIG.id.toUpperCase()} WINS THE SERIES!`;\r
+
+      \      } else if (seriesState.seriesWinner === enemy) {\r
+
+      \        line4 = `${ENEMY_CONFIG.id.toUpperCase()} WINS THE SERIES!`;\r
+
+      \      } else {\r
+
+      \        line4 = `SERIES ENDS IN A TIE!`;\r
+
+      \      }\r
+
+      \    }\r
+
+      \    \r
+
+      \    // Display all information with updated positioning\r
+
+      \    text(line1, width/2, height/2 - overlayHeight/2 + 35); // Winner
+      announcement at top\r
+
+      \    \r
+
+      \    textSize(18);\r
+
+      \    text(line2, width/2, height/2 - overlayHeight/2 + 65); // Series
+      score\r
+
+      \    \r
+
+      \    textSize(16);\r
+
+      \    text(line3, width/2, height/2 - overlayHeight/2 + 90); // Death
+      message\r
+
+      \    \r
+
+      \    if (line4) {\r
+
+      \      textSize(20);\r
+
+      \      text(line4, width/2, height/2 - overlayHeight/2 + 120); // Series
+      winner\r
+
+      \    }\r
+
+      \    \r
+
+      \    // Instructions at bottom in smaller text\r
+
+      \    textSize(12);\r
+
+      \    textAlign(LEFT, CENTER);\r
+
+      \    text(instructionsText, width/2 - 60, height/2 + overlayHeight/2 -
+      40);\r
+
+      \    textAlign(CENTER, CENTER);\r
+
+      \  } else {\r
+
+      \    // Non-series mode positioning\r
+
+      \    text(line1, width/2, height/2 - 40); // Winner announcement\r
+
+      \    \r
+
+      \    textSize(16);\r
+
+      \    text(line3, width/2, height/2 - 10); // Death message\r
+
+      \    \r
+
+      \    // Instructions at bottom in smaller text\r
+
+      \    textSize(12);\r
+
+      \    textAlign(LEFT, CENTER);\r
+
+      \    text(instructionsText, width/2 - 60, height/2 + 30);\r
+
+      \    textAlign(CENTER, CENTER);\r
+
+      \  }\r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function getDeathMessage(deathCause) {\r
+
+      \  switch (deathCause) {\r
+
+      \    case 'wall':\r
+
+      \      return 'crashed into a wall.';\r
+
+      \    case 'self':\r
+
+      \      return 'crashed into themselves.';\r
+
+      \    case 'opponent':\r
+
+      \      return 'crashed into their opponent.';\r
+
+      \    case 'head-to-head':\r
+
+      \      return 'collided head-to-head.';\r
+
+      \    case 'poison':\r
+
+      \      return 'ate poison.';\r
+
+      \    default:\r
+
+      \      return 'crashed.';\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function bumpScore(n) {\r
+
+      \  score += n;\r
+
+      }\r
+
+      \r
+
+      function updateSpeed() {\r
+
+      \  const scale = calculateSpeedScale(sliderValue);\r
+
+      \  \r
+
+      \  // Update both snakes' speed using proportional scaling\r
+
+      \  if (player) player.stepMs = scaleSpeed(SPEED_CONFIG.playerBaseMs,
+      scale);\r
+
+      \  if (enemy) enemy.stepMs = scaleSpeed(SPEED_CONFIG.enemyBaseMs,
+      scale);\r
+
+      }\r
+
+      \r
+
+      // Convert slider value (0-100) to speed scale\r
+
+      function calculateSpeedScale(sliderValue) {\r
+
+      \  // Slider: 0 (left/1x speed) to 100 (right/fastest)\r
+
+      \  // Scale: 1.0 (normal) to minScale (fastest - lowest ms value)\r
+
+      \  \r
+
+      \  // At 0: return 1.0 (normal speed)\r
+
+      \  // At 100: return minScale (fastest speed)\r
+
+      \  const minScale = SPEED_CONFIG.minMs / SPEED_CONFIG.playerBaseMs;\r
+
+      \  \r
+
+      \  // Linear interpolation from 1.0 to minScale\r
+
+      \  const normalizedValue = sliderValue / 100; // 0 to 1\r
+
+      \  return 1.0 - (normalizedValue * (1.0 - minScale));\r
+
+      }\r
+
+      \r
+
+      // Apply scale to a base speed, ensuring it stays within limits\r
+
+      function scaleSpeed(baseMs, scale) {\r
+
+      \  const scaled = Math.round(baseMs * scale);\r
+
+      \  return Math.max(SPEED_CONFIG.minMs, Math.min(SPEED_CONFIG.maxMs,
+      scaled));\r
+
+      }\r
+
+      \r
+
+      // ------ Restart logic ------\r
+
+      // Initialize series state\r
+
+      function resetSeriesState() {\r
+
+      \  // Series is never active in training mode\r
+
+      \  const isSeriesActive = GAME_CONFIG.series.enabled &&
+      !GAME_CONFIG.trainingMode;\r
+
+      \  \r
+
+      \  seriesState = {\r
+
+      \    active: isSeriesActive,\r
+
+      \    playerWins: 0,\r
+
+      \    enemyWins: 0,\r
+
+      \    gamesPlayed: 0,\r
+
+      \    seriesWinner: null,\r
+
+      \    seriesOver: false\r
+
+      \  };\r
+
+      }\r
+
+      \r
+
+      function startNewGame(continueSeriesMode = false) {\r
+
+      \  // Calculate current speed scale from slider (use internal
+      sliderValue)\r
+
+      \  const scale = calculateSpeedScale(sliderValue);\r
+
+      \  \r
+
+      \  player = new Snake({\r
+
+      \    ...PLAYER_CONFIG,\r
+
+      \    stepMs: scaleSpeed(SPEED_CONFIG.playerBaseMs, scale)\r
+
+      \  });\r
+
+      \  \r
+
+      \  // Only create enemy when not in training mode\r
+
+      \  if (!GAME_CONFIG.trainingMode) {\r
+
+      \    enemy = new Snake({\r
+
+      \      ...ENEMY_CONFIG,\r
+
+      \      stepMs: scaleSpeed(SPEED_CONFIG.enemyBaseMs, scale)\r
+
+      \    });\r
+
+      \    \r
+
+      \    // Initialize or continue series when not in training mode\r
+
+      \    if (GAME_CONFIG.series.enabled) {\r
+
+      \      if (!continueSeriesMode) {\r
+
+      \        // Start fresh series\r
+
+      \        resetSeriesState();\r
+
+      \      }\r
+
+      \      seriesState.active = true;\r
+
+      \    }\r
+
+      \  } else {\r
+
+      \    enemy = undefined; // Ensure enemy is undefined in training mode\r
+
+      \    seriesState.active = false;\r
+
+      \  }\r
+
+      \r
+
+      \  winner = null;\r
+
+      \  gameOver = false;\r
+
+      \  gamePaused = false;\r
+
+      \  preRoundScreen = !continueSeriesMode; // Show pre-round screen when
+      starting a new game\r
+
+      \r
+
+      \  frameHistory = [];\r
+
+      \  exitReplayMode();\r
+
+      \r
+
+      \  game.player = player;\r
+
+      \  game.enemy = enemy;\r
+
+      \  game.food = food;\r
+
+      \r
+
+      \  score = 0;\r
+
+      \r
+
+      \  initializeFoods();\r
+
+      \r
+
+      \  loop();\r
+
+      }\r
+
+      \r
+
+      function resetGame() {\r
+
+      \  // If we're on the pre-round screen, just dismiss it and start
+      playing\r
+
+      \  if (preRoundScreen) {\r
+
+      \    preRoundScreen = false;\r
+
+      \    return;\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Otherwise, reset the entire game\r
+
+      \  startNewGame(false); // false = don't continue series, start fresh\r
+
+      }\r
+
+      \r
+
+      // Continue series (used by Enter key)\r
+
+      function continueGame() {\r
+
+      \  if (gameOver && seriesState.active && !seriesState.seriesOver) {\r
+
+      \    startNewGame(true); // true = continue series\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function togglePause() {\r
+
+      \  if (gameOver || inReplayMode || preRoundScreen) return; // Can't pause
+      during pre-round, game over or replay mode\r
+
+      \  \r
+
+      \  gamePaused = !gamePaused;\r
+
+      \  \r
+
+      \  if (gamePaused) {\r
+
+      \    noLoop();\r
+
+      \  } else {\r
+
+      \    loop();\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function drawPauseOverlay() {\r
+
+      \  push();\r
+
+      \  noStroke();\r
+
+      \  fill(0, 150); // Semi-transparent overlay\r
+
+      \  rect(0, 0, width, height);\r
+
+      \  \r
+
+      \  fill(255, 220);\r
+
+      \  rect(0, height/2 - 30, width, 60);\r
+
+      \  \r
+
+      \  fill(0);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  textSize(18);\r
+
+      \  text('Game Paused', width/2, height/2 - 10);\r
+
+      \  textSize(14);\r
+
+      \  text('Press SPACE or click Resume to continue', width/2, height/2 +
+      10);\r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function drawPreRoundScreen() {\r
+
+      \r
+
+      \  const baseYOffset = 20;\r
+
+      \  push();\r
+
+      \  background('#0b0b0b');\r
+
+      \  drawGrid();\r
+
+      \  \r
+
+      \  // Draw snakes in their starting positions but frozen\r
+
+      \  player.draw(this, GRID.cell);\r
+
+      \  if (enemy) enemy.draw(this, GRID.cell);\r
+
+      \  \r
+
+      \  // Draw the pre-round message box\r
+
+      \  noStroke();\r
+
+      \  fill(255, 220);\r
+
+      \  const boxHeight = 260;\r
+
+      \  rect(0, height/2 - boxHeight/2, width, boxHeight);\r
+
+      \  \r
+
+      \  fill(0);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  \r
+
+      \  // Draw player vs enemy with color squares - dynamically sized\r
+
+      \  const vsText = ` vs. `;\r
+
+      \  const playerText = PLAYER_CONFIG.id;\r
+
+      \  const enemyText = ENEMY_CONFIG.id;\r
+
+      \  const textY = height/2 - boxHeight/2 + 40;\r
+
+      \  const maxWidth = width - 40; // Leave 20px margin on each side\r
+
+      \  \r
+
+      \  // Calculate optimal font size based on content width\r
+
+      \  const baseFont = 30;\r
+
+      \  textSize(baseFont);\r
+
+      \  \r
+
+      \  // Measure text at base size\r
+
+      \  const basePlayerWidth = textWidth(playerText);\r
+
+      \  const baseVsWidth = textWidth(vsText);\r
+
+      \  const baseEnemyWidth = textWidth(enemyText);\r
+
+      \  const baseSquareSize = 20;\r
+
+      \  const spacing = 10; // 5px on each side of squares\r
+
+      \  \r
+
+      \  // Total width at base font size\r
+
+      \  const baseContentWidth = basePlayerWidth + baseVsWidth +
+      baseEnemyWidth;\r
+
+      \  const baseTotalWidth = baseContentWidth + (2 * baseSquareSize) +
+      spacing;\r
+
+      \  \r
+
+      \  // Calculate scale factor needed to fit\r
+
+      \  const scaleFactor = Math.min(1.0, maxWidth / baseTotalWidth);\r
+
+      \  \r
+
+      \  // Apply scale factor with minimum constraints\r
+
+      \  const fontSize = Math.max(12, baseFont * scaleFactor);\r
+
+      \  const squareSize = Math.max(12, baseSquareSize * scaleFactor);\r
+
+      \  \r
+
+      \  // Set final font size and measure actual widths\r
+
+      \  textSize(fontSize);\r
+
+      \  const playerTextWidth = textWidth(playerText);\r
+
+      \  const vsTextWidth = textWidth(vsText);\r
+
+      \  const enemyTextWidth = textWidth(enemyText);\r
+
+      \  const totalWidth = squareSize + 5 + playerTextWidth + vsTextWidth +
+      squareSize + 5 + enemyTextWidth;\r
+
+      \  \r
+
+      \  // Starting x position (center everything)\r
+
+      \  const startX = width/2 - totalWidth/2;\r
+
+      \  \r
+
+      \  // Draw player color square using config color\r
+
+      \  fill(PLAYER_CONFIG.color);\r
+
+      \  rect(startX, textY - squareSize/2, squareSize, squareSize, 3);\r
+
+      \  \r
+
+      \  // Draw player name\r
+
+      \  fill(0);\r
+
+      \  textAlign(LEFT, CENTER);\r
+
+      \  text(playerText, startX + squareSize + 5, textY);\r
+
+      \  \r
+
+      \  // Draw \"vs.\"\r
+
+      \  text(vsText, startX + squareSize + 5 + playerTextWidth, textY);\r
+
+      \  \r
+
+      \  // Draw enemy color square using config color\r
+
+      \  fill(ENEMY_CONFIG.color);\r
+
+      \  rect(startX + squareSize + 5 + playerTextWidth + vsTextWidth, textY -
+      squareSize/2, squareSize, squareSize, 3);\r
+
+      \  \r
+
+      \  // Draw enemy name\r
+
+      \  fill(0);\r
+
+      \  text(enemyText, startX + squareSize + 5 + playerTextWidth + vsTextWidth
+      + squareSize + 5, textY);\r
+
+      \  \r
+
+      \  // Reset text alignment to center for the rest of the content\r
+
+      \  fill(0);\r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  textSize(16);\r
+
+      \  text('RULES', width/2, height/2 - boxHeight/2 + 60 + baseYOffset);\r
+
+      \  \r
+
+      \  textSize(16);\r
+
+      \  text('Round Winner: Last snake standing', width/2, height/2 -
+      boxHeight/2 + 80 + baseYOffset);\r
+
+      \r
+
+      \  textSize(16);\r
+
+      \  text(`Series Winner: First to ${GAME_CONFIG.series.winsToWin} round
+      wins`, width/2, height/2 - boxHeight/2 + 100 + baseYOffset);\r
+
+      \r
+
+      \  textSize(16);\r
+
+      \  text('You Crash If You Hit:', width/2, height/2 - boxHeight/2 + 120 +
+      baseYOffset);\r
+
+      \r
+
+      \  textAlign(CENTER, CENTER);\r
+
+      \  textSize(14);\r
+
+      \  text('Any Wall\\nYour own body\\nOpponent\\'s body', width/2, height/2
+      - boxHeight/2 + 160 + baseYOffset);\r
+
+      \r
+
+      \  textSize(14);\r
+
+      \  text('Press ENTER to begin', width/2, height/2 - boxHeight/2 + 210 +
+      baseYOffset);\r
+
+      \r
+
+      \  pop();\r
+
+      }\r
+
+      \r
+
+      function mousePressed() {\r
+
+      \  // Check if mouse is in slider area\r
+
+      \  if (mouseY >= canvasH && mouseY <= canvasH + SLIDER_HEIGHT) {\r
+
+      \    isDraggingSlider = true;\r
+
+      \    updateSliderFromMouse();\r
+
+      \    return false; // Prevent default behavior\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function mouseDragged() {\r
+
+      \  if (isDraggingSlider) {\r
+
+      \    updateSliderFromMouse();\r
+
+      \    return false; // Prevent default behavior\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      function mouseReleased() {\r
+
+      \  isDraggingSlider = false;\r
+
+      }\r
+
+      \r
+
+      function updateSliderFromMouse() {\r
+
+      \  const sliderMargin = 15;\r
+
+      \  const sliderBarWidth = canvasW - SLIDER_LEFT_OFFSET - sliderMargin;\r
+
+      \  const sliderBarX = SLIDER_LEFT_OFFSET;\r
+
+      \  \r
+
+      \  // Clamp mouse X to slider bounds\r
+
+      \  const clampedX = constrain(mouseX, sliderBarX, sliderBarX +
+      sliderBarWidth);\r
+
+      \  \r
+
+      \  // Calculate new slider value (0-100)\r
+
+      \  sliderValue = Math.round(((clampedX - sliderBarX) / sliderBarWidth) *
+      100);\r
+
+      \  sliderValue = constrain(sliderValue, 0, 100);\r
+
+      \  \r
+
+      \  // Update speed\r
+
+      \  updateSpeed();\r
+
+      }\r
+
+      \r
+
+      function keyPressed() {\r
+
+      \  if (key.toLowerCase() === 'r') {\r
+
+      \    resetGame();\r
+
+      \  } else if (keyCode === ENTER || keyCode === RETURN) {\r
+
+      \    if (preRoundScreen) {\r
+
+      \      // Dismiss pre-round screen on Enter/Return\r
+
+      \      preRoundScreen = false;\r
+
+      \      return;\r
+
+      \    }\r
+
+      \    if (gameOver && GAME_CONFIG.trainingMode) {\r
+
+      \      resetGame();\r
+
+      \    } else {\r
+
+      \      continueGame();\r
+
+      \    }\r
+
+      \  } else if (key === ' ') {\r
+
+      \    if (!inReplayMode && !preRoundScreen) {\r
+
+      \      togglePause();\r
+
+      \    }\r
+
+      \  } else if (key.toLowerCase() === 'f') {\r
+
+      \    if (inReplayMode) {\r
+
+      \      exitReplayMode();\r
+
+      \      redraw();\r
+
+      \    } else if (gameOver && frameHistory.length > 0) {\r
+
+      \      enterReplayMode();\r
+
+      \    }\r
+
+      \  } else if (keyCode === 37) {\r
+
+      \    if (inReplayMode) {\r
+
+      \      stepFrame('backward');\r
+
+      \    }\r
+
+      \  } else if (keyCode === 39) {\r
+
+      \    if (inReplayMode) {\r
+
+      \      stepFrame('forward');\r
+
+      \    }\r
+
+      \  } else if (keyCode === 38) {\r
+
+      \    if (inReplayMode) {\r
+
+      \      replayBannerAtTop = true;\r
+
+      \      redraw();\r
+
+      \    }\r
+
+      \  } else if (keyCode === 40) {\r
+
+      \    if (inReplayMode) {\r
+
+      \      replayBannerAtTop = false;\r
+
+      \      redraw();\r
+
+      \    }\r
+
+      \  }\r
+
+      }\r\n"
+  - path: course1/snake.js
+    content: "class Snake {\r
+
+      \  /**\r
+
+      \   * @param {object} opts\r
+
+      \   *  - id: string\r
+
+      \   *  - start: {x,y}\r
+
+      \   *  - color: string\r
+
+      \   *  - stepMs: number (default 200)\r
+
+      \   *  - size: number (default 1) - initial snake length\r
+
+      \   *  - direction: {x, y} (default {x: 1, y: 0}) - initial movement
+      direction\r
+
+      \   */\r
+
+      \  constructor({ id, start, color = '#22c55e', stepMs = 200, size = 1,
+      direction = { x: 1, y: 0 } }) {\r
+
+      \    this.id = id;\r
+
+      \    this.color = color;\r
+
+      \    this.stepMs = stepMs;\r
+
+      \    this.body = [ { x: start.x, y: start.y } ];\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    this.dir = { x: normalizedDir.x, y: normalizedDir.y };\r
+
+      \    this.nextDir = { x: normalizedDir.x, y: normalizedDir.y }; //
+      buffered direction (from input / AI)\r
+
+      \    this.growBy = 0;\r
+
+      \    this.alive = true;\r
+
+      \    this.deathCause = null;\r
+
+      \    this._lastMove = 0;\r
+
+      \r
+
+      \    // Add initial body segments based on size parameter\r
+
+      \    this._initializeBody(size, normalizedDir);\r
+
+      \  }\r
+
+      \r
+
+      \  head() { return this.body[0]; }\r
+
+      \r
+
+      \  // Helper method to normalize direction - converts enum to coordinate
+      object if needed\r
+
+      \  _normalizeDirection(direction) {\r
+
+      \    if (typeof direction === 'string') {\r
+
+      \      return directionToCoords(direction);\r
+
+      \    }\r
+
+      \    return direction; // already a coordinate object\r
+
+      \  }\r
+
+      \r
+
+      \  // Initialize body with clockwise turning when hitting boundaries\r
+
+      \  _initializeBody(size, direction) {\r
+
+      \    if (size <= 1) return;\r
+
+      \    \r
+
+      \    const { GRID } = game;\r
+
+      \    \r
+
+      \    // Start with opposite direction from movement\r
+
+      \    let currentDir = { x: -direction.x, y: -direction.y };\r
+
+      \    let currentX = this.body[0].x;\r
+
+      \    let currentY = this.body[0].y;\r
+
+      \    \r
+
+      \    for (let i = 1; i < size; i++) {\r
+
+      \      let nextX = currentX + currentDir.x;\r
+
+      \      let nextY = currentY + currentDir.y;\r
+
+      \      \r
+
+      \      // Check if next position would be out of bounds\r
+
+      \      let needsTurn = false;\r
+
+      \      if (nextX < 0 || nextX >= GRID.cols || nextY < 0 || nextY >=
+      GRID.rows) {\r
+
+      \        needsTurn = true;\r
+
+      \      }\r
+
+      \      \r
+
+      \      // Check if next position would collide with existing body parts\r
+
+      \      if (!needsTurn) {\r
+
+      \        needsTurn = this.body.some(segment => segment.x === nextX &&
+      segment.y === nextY);\r
+
+      \      }\r
+
+      \      \r
+
+      \      // If we need to turn, rotate clockwise and try again\r
+
+      \      if (needsTurn) {\r
+
+      \        currentDir = this._turnClockwise(currentDir);\r
+
+      \        nextX = currentX + currentDir.x;\r
+
+      \        nextY = currentY + currentDir.y;\r
+
+      \        \r
+
+      \        // If still out of bounds after turning, try turning again (up to
+      4 times)\r
+
+      \        let turnAttempts = 0;\r
+
+      \        while ((nextX < 0 || nextX >= GRID.cols || nextY < 0 || nextY >=
+      GRID.rows || \r
+
+      \                this.body.some(segment => segment.x === nextX &&
+      segment.y === nextY)) && \r
+
+      \               turnAttempts < 3) {\r
+
+      \          currentDir = this._turnClockwise(currentDir);\r
+
+      \          nextX = currentX + currentDir.x;\r
+
+      \          nextY = currentY + currentDir.y;\r
+
+      \          turnAttempts++;\r
+
+      \        }\r
+
+      \        \r
+
+      \        // If we've exceeded turn attempts, just use whatever nextX/nextY
+      we have\r
+
+      \      }\r
+
+      \      \r
+
+      \      if (nextX < 0 || nextX >= GRID.cols || nextY < 0 || nextY >=
+      GRID.rows ||\r
+
+      \          this.body.some(segment => segment.x === nextX && segment.y ===
+      nextY)) {\r
+
+      \        break; // Stop generating body segments\r
+
+      \      }\r
+
+      \      \r
+
+      \      this.body.push({ x: nextX, y: nextY });\r
+
+      \      currentX = nextX;\r
+
+      \      currentY = nextY;\r
+
+      \    }\r
+
+      \  }\r
+
+      \r
+
+      \  // Helper method to turn direction clockwise\r
+
+      \  _turnClockwise(direction) {\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    if (normalizedDir.x === 1 && normalizedDir.y === 0) return { x: 0, y:
+      1 };   // right -> down\r
+
+      \    if (normalizedDir.x === 0 && normalizedDir.y === 1) return { x: -1,
+      y: 0 };  // down -> left  \r
+
+      \    if (normalizedDir.x === -1 && normalizedDir.y === 0) return { x: 0,
+      y: -1 }; // left -> up\r
+
+      \    if (normalizedDir.x === 0 && normalizedDir.y === -1) return { x: 1,
+      y: 0 };  // up -> right\r
+
+      \    return direction;\r
+
+      \  }\r
+
+      \r
+
+      \  setDirection(d) {\r
+
+      \    const normalizedDir = this._normalizeDirection(d);\r
+
+      \    // Prevent reversing into itself (cannot go directly opposite)\r
+
+      \    if (this.body.length > 1) {\r
+
+      \      const opposite = (this.dir.x === -normalizedDir.x && this.dir.y ===
+      -normalizedDir.y);\r
+
+      \      if (opposite) return; // ignore illegal reversal\r
+
+      \    }\r
+
+      \    this.nextDir = { x: normalizedDir.x, y: normalizedDir.y };\r
+
+      \  }\r
+
+      \r
+
+      \  /** Move one cell if stepMs elapsed; return {moved, ateFood, eatenFood,
+      newHead} */\r
+
+      \  moveIfReady(nowMs, game) {\r
+
+      \    if (!this.alive) return { moved: false, ateFood: false, eatenFood:
+      null, newHead: null };\r
+
+      \    if (nowMs - this._lastMove < this.stepMs) return { moved: false,
+      ateFood: false, eatenFood: null, newHead: null };\r
+
+      \r
+
+      \    const { foods } = game;\r
+
+      \r
+
+      \    // Apply buffered direction at tick time\r
+
+      \    this.dir = { ...this.nextDir };\r
+
+      \r
+
+      \    const next = { x: this.head().x + this.dir.x, y: this.head().y +
+      this.dir.y };\r
+
+      \r
+
+      \    // Advance head\r
+
+      \    this.body.unshift(next);\r
+
+      \r
+
+      \    // Food?\r
+
+      \    let ateFood = false;\r
+
+      \    let eatenFood = null;\r
+
+      \    let atePoison = false;\r
+
+      \    if (foods) {\r
+
+      \      for (const food of foods) {\r
+
+      \        if (next.x === food.x && next.y === food.y) {\r
+
+      \          ateFood = true;\r
+
+      \          eatenFood = food;\r
+
+      \          // Handle different food types\r
+
+      \          if (food.type === 'poison') {\r
+
+      \            atePoison = true;\r
+
+      \            // Poison immediately kills the snake\r
+
+      \            this.alive = false;\r
+
+      \            this.deathCause = 'poison';\r
+
+      \          } else {\r
+
+      \            // Regular food grows the snake\r
+
+      \            this.growBy += 1;\r
+
+      \          }\r
+
+      \          break;\r
+
+      \        }\r
+
+      \      }\r
+
+      \    }\r
+
+      \r
+
+      \    // Trim tail unless growing\r
+
+      \    if (this.growBy > 0) {\r
+
+      \      this.growBy -= 1;\r
+
+      \    } else {\r
+
+      \      this.body.pop();\r
+
+      \    }\r
+
+      \r
+
+      \    this._lastMove = nowMs;\r
+
+      \    return { moved: true, ateFood, eatenFood, atePoison, newHead: next
+      };\r
+
+      \  }\r
+
+      \r
+
+      \  draw(p, cellSize) {\r
+
+      \    p.push();\r
+
+      \    p.noStroke();\r
+
+      \    p.fill(this.color);\r
+
+      \    for (let i = 0; i < this.body.length; i++) {\r
+
+      \      const b = this.body[i];\r
+
+      \      const r = i === 0 ? 6 : 3; // roundness hint: bigger on head\r
+
+      \      p.rect(b.x * cellSize, b.y * cellSize, cellSize, cellSize, r);\r
+
+      \    }\r
+
+      \    p.pop();\r
+
+      \  }\r
+
+      \r
+
+      \  /** Helper to get next cell for a given direction */\r
+
+      \  _getNextCell(direction) {\r
+
+      \    if (!direction) direction = this.nextDir;\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    return { x: this.head().x + normalizedDir.x, y: this.head().y +
+      normalizedDir.y };\r
+
+      \  }\r
+
+      \r
+
+      towards(target) {\r
+
+      \  const head = this.head();\r
+
+      \  const dx = target.x - head.x;\r
+
+      \  const dy = target.y - head.y;\r
+
+      \  \r
+
+      \  if (dx === 0 && dy === 0) {\r
+
+      \    return this.currentDirection();\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Calculate the direct path direction\r
+
+      \  let directDirection;\r
+
+      \  if (Math.abs(dx) > Math.abs(dy)) {\r
+
+      \    directDirection = { x: Math.sign(dx), y: 0 };\r
+
+      \  } else {\r
+
+      \    directDirection = { x: 0, y: Math.sign(dy) };\r
+
+      \  }\r
+
+      \  \r
+
+      \  // Check if this would be a backward movement\r
+
+      \  const currentDir = this.dir; // Use internal coordinate direction\r
+
+      \  const isBackward = (currentDir.x === -directDirection.x && currentDir.y
+      === -directDirection.y);\r
+
+      \  \r
+
+      \  // If direct path is not backward and is safe, use it\r
+
+      \  if (!isBackward || this.body.length <= 1) {\r
+
+      \    return coordsToDirection(directDirection);\r
+
+      \  }\r
+
+      \  \r
+
+      \  // If going directly would be backward or unsafe, find the best turning
+      direction\r
+
+      \  // We need to turn either left or right relative to our current
+      direction\r
+
+      \  const leftDir = this._turnLeft(currentDir);\r
+
+      \  const rightDir = this._turnRight(currentDir);\r
+
+      \  \r
+
+      \  // Calculate which turn gets us closer to the target faster\r
+
+      \  const leftNextPos = { x: head.x + leftDir.x, y: head.y + leftDir.y };\r
+
+      \  const rightNextPos = { x: head.x + rightDir.x, y: head.y + rightDir.y
+      };\r
+
+      \  \r
+
+      \  const leftDistance = Math.abs(leftNextPos.x - target.x) +
+      Math.abs(leftNextPos.y - target.y);\r
+
+      \  const rightDistance = Math.abs(rightNextPos.x - target.x) +
+      Math.abs(rightNextPos.y - target.y);\r
+
+      \  \r
+
+      \  // Determine which direction is closer\r
+
+      \  const fasterDir = leftDistance <= rightDistance ? leftDir : rightDir;\r
+
+      \  const slowerDir = leftDistance <= rightDistance ? rightDir : leftDir;\r
+
+      \  \r
+
+      \  // Check if the faster direction is safe\r
+
+      \  if (!this.willHitAnything(fasterDir)) {\r
+
+      \    return coordsToDirection(fasterDir);\r
+
+      \  }\r
+
+      \  \r
+
+      \  // If faster direction is not safe, try the slower direction\r
+
+      \  if (!this.willHitAnything(slowerDir)) {\r
+
+      \    return coordsToDirection(slowerDir);\r
+
+      \  }\r
+
+      \  \r
+
+      \  // If both directions are unsafe, return the current direction as
+      fallback\r
+
+      \  return this.currentDirection();\r
+
+      }\r
+
+      \r
+
+      \  getClosestFood() {\r
+
+      \    // If there are no foods, fallback to the food object for backward
+      compatibility\r
+
+      \    if (!game.foods || game.foods.length === 0) {\r
+
+      \      return game.food;\r
+
+      \    }\r
+
+      \r
+
+      \    let closestFood = game.foods[0];\r
+
+      \    let minDistance = this.distanceTo(closestFood);\r
+
+      \r
+
+      \    for (let i = 1; i < game.foods.length; i++) {\r
+
+      \      const food = game.foods[i];\r
+
+      \      const distance = this.distanceTo(food);\r
+
+      \      if (distance < minDistance) {\r
+
+      \        minDistance = distance;\r
+
+      \        closestFood = food;\r
+
+      \      }\r
+
+      \    }\r
+
+      \r
+
+      \    return closestFood;\r
+
+      \  }\r
+
+      \r
+
+      \  towardsClosestFood() {\r
+
+      \    const targetFood = this.getClosestFood();\r
+
+      \    return this.towards(targetFood);\r
+
+      \  }\r
+
+      \r
+
+      \  towardsEnemy() {\r
+
+      \    // Dynamically determine the enemy based on this snake's ID\r
+
+      \    const otherSnake = this.id === PLAYER_CONFIG.id ? game.enemy :
+      game.player;\r
+
+      \    if (!otherSnake?.alive) {\r
+
+      \      // If enemy isn't alive, return a random safe direction\r
+
+      \      return this.randomSafeDirection();\r
+
+      \    }\r
+
+      \    return this.towards(otherSnake.head());\r
+
+      \  }\r
+
+      \r
+
+      \  awayFromEnemy() {\r
+
+      \    // Dynamically determine the enemy based on this snake's ID\r
+
+      \    const otherSnake = this.id === PLAYER_CONFIG.id ? game.enemy :
+      game.player;\r
+
+      \    if (!otherSnake?.alive) {\r
+
+      \      // If enemy isn't alive, return current direction\r
+
+      \      return this.currentDirection();\r
+
+      \    }\r
+
+      \    const allDirections = new Set([Direction.UP, Direction.DOWN,
+      Direction.LEFT, Direction.RIGHT]);\r
+
+      \r
+
+      \    // remove direction towards enemy\r
+
+      \    const towardsEnemyDir = this.towards(otherSnake.head());\r
+
+      \    const towardsEnemyDirCoords = directionToCoords(towardsEnemyDir);\r
+
+      \    allDirections.delete(towardsEnemyDir);\r
+
+      \r
+
+      \    // remove direction that would reverse the snake\r
+
+      \    const reversedCoords = { x: -towardsEnemyDirCoords.x, y:
+      -towardsEnemyDirCoords.y };\r
+
+      \    const reversedDir = coordsToDirection(reversedCoords);\r
+
+      \    allDirections.delete(reversedDir);\r
+
+      \r
+
+      \    // From remaining directions, pick a random safe one\r
+
+      \    const safeDirections = Array.from(allDirections).filter(d =>
+      this.isPredictablySafe(d));\r
+
+      \    if (safeDirections.length > 0) {\r
+
+      \      const randomIndex = Math.floor(Math.random() *
+      safeDirections.length);\r
+
+      \      return safeDirections[randomIndex];\r
+
+      \    }\r
+
+      \r
+
+      \    // If no safe directions found, continue current direction\r
+
+      \    return this.currentDirection();\r
+
+      \  }\r
+
+      \r
+
+      \  randomSafeDirection() {\r
+
+      \    const directions = [Direction.UP, Direction.DOWN, Direction.LEFT,
+      Direction.RIGHT];\r
+
+      \    const safeDirections = directions.filter(d =>
+      this.isPredictablySafe(d));\r
+
+      \    if (safeDirections.length > 0) {\r
+
+      \      return safeDirections[Math.floor(Math.random() *
+      safeDirections.length)];\r
+
+      \    }\r
+
+      \    return this.currentDirection(); // No safe moves, continue straight\r
+
+      \  }\r
+
+      \r
+
+      \  // Helper method to turn left relative to current direction\r
+
+      \  _turnLeft(direction) {\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    if (normalizedDir.x === 1 && normalizedDir.y === 0) return { x: 0, y:
+      -1 }; // right -> up\r
+
+      \    if (normalizedDir.x === 0 && normalizedDir.y === -1) return { x: -1,
+      y: 0 }; // up -> left\r
+
+      \    if (normalizedDir.x === -1 && normalizedDir.y === 0) return { x: 0,
+      y: 1 }; // left -> down\r
+
+      \    if (normalizedDir.x === 0 && normalizedDir.y === 1) return { x: 1, y:
+      0 }; // down -> right\r
+
+      \    return direction; // fallback\r
+
+      \  }\r
+
+      \r
+
+      \  // Helper method to turn right relative to current direction\r
+
+      \  _turnRight(direction) {\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    if (normalizedDir.x === 1 && normalizedDir.y === 0) return { x: 0, y:
+      1 }; // right -> down\r
+
+      \    if (normalizedDir.x === 0 && normalizedDir.y === 1) return { x: -1,
+      y: 0 }; // down -> left\r
+
+      \    if (normalizedDir.x === -1 && normalizedDir.y === 0) return { x: 0,
+      y: -1 }; // left -> up\r
+
+      \    if (normalizedDir.x === 0 && normalizedDir.y === -1) return { x: 1,
+      y: 0 }; // up -> right\r
+
+      \    return direction; // fallback\r
+
+      \  }\r
+
+      \r
+
+      \  // New helper method for more thorough safety checking\r
+
+      \  isPredictablySafe(direction) {\r
+
+      \    // First do basic collision checks\r
+
+      \    if (this.willHitAnything(direction)) {\r
+
+      \      return false;\r
+
+      \    }\r
+
+      \    \r
+
+      \    // Get where we would be after this move\r
+
+      \    const myNextPos = this._getNextCell(direction);\r
+
+      \    \r
+
+      \    // Get the other snake and predict where it will be\r
+
+      \    const otherSnake = this.id === PLAYER_CONFIG.id ? game.enemy :
+      game.player;\r
+
+      \    if (otherSnake?.alive) {\r
+
+      \      // Predict enemy's next position based on their current direction\r
+
+      \      const enemyCurrentDir = otherSnake.dir; // Use internal coordinate
+      direction\r
+
+      \      const enemyHead = otherSnake.head();\r
+
+      \      const enemyNextPos = {\r
+
+      \        x: enemyHead.x + enemyCurrentDir.x,\r
+
+      \        y: enemyHead.y + enemyCurrentDir.y\r
+
+      \      };\r
+
+      \      \r
+
+      \      // Check if we would collide with enemy's predicted position\r
+
+      \      if (myNextPos.x === enemyNextPos.x && myNextPos.y ===
+      enemyNextPos.y) {\r
+
+      \        return false; // Head-to-head collision predicted\r
+
+      \      }\r
+
+      \      \r
+
+      \      // Also check if enemy's predicted body (after it moves) would
+      block us\r
+
+      \      // Enemy's body after moving will be: [enemyNextPos,
+      ...otherSnake.body.slice(0, -1)]\r
+
+      \      // (unless enemy eats food, but we can't predict that reliably)\r
+
+      \      const enemyFutureBody = [enemyNextPos, ...otherSnake.body.slice(0,
+      -1)];\r
+
+      \      if (enemyFutureBody.some(segment => segment.x === myNextPos.x &&
+      segment.y === myNextPos.y)) {\r
+
+      \        return false;\r
+
+      \      }\r
+
+      \    }\r
+
+      \    \r
+
+      \    return true;\r
+
+      \  }\r
+
+      \r
+
+      \  // --- Checks ---\r
+
+      \  willHitWall(direction) {\r
+
+      \    const { GRID } = game;\r
+
+      \    const next = this._getNextCell(direction);\r
+
+      \    return next.x < 0 || next.y < 0 || next.x >= GRID.cols || next.y >=
+      GRID.rows;\r
+
+      \  }\r
+
+      \r
+
+      \  willHitSelf(direction) {\r
+
+      \    const next = this._getNextCell(direction);\r
+
+      \    // The tail will move, so we don't check collision with the very last
+      segment.\r
+
+      \    return this.body.slice(0, -1).some(c => c.x === next.x && c.y ===
+      next.y);\r
+
+      \  }\r
+
+      \r
+
+      \  willHitEnemy(direction) {\r
+
+      \    const otherSnake = this.id === PLAYER_CONFIG.id ? game.enemy :
+      game.player;\r
+
+      \    if (!otherSnake?.alive) return false;\r
+
+      \    const next = this._getNextCell(direction);\r
+
+      \    return otherSnake.body.some(c => c.x === next.x && c.y === next.y);\r
+
+      \  }\r
+
+      \  \r
+
+      \  willHitPoison(direction) {\r
+
+      \    if (!game.foods || game.foods.length === 0) return false;\r
+
+      \    const next = this._getNextCell(direction);\r
+
+      \    return game.foods.some(food => food.type === 'poison' && food.x ===
+      next.x && food.y === next.y);\r
+
+      \  }\r
+
+      \r
+
+      \  willHitAnything(direction) {\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    // Prevent reversing into itself\r
+
+      \    if (this.body.length > 1) {\r
+
+      \      const opposite = (this.dir.x === -normalizedDir.x && this.dir.y ===
+      -normalizedDir.y);\r
+
+      \      if (opposite) return true;\r
+
+      \    }\r
+
+      \    return this.willHitWall(direction) ||\r
+
+      \           this.willHitSelf(direction) ||\r
+
+      \           this.willHitEnemy(direction) ||\r
+
+      \           this.willHitPoison(direction);\r
+
+      \  }\r
+
+      \r
+
+      \  // --- Spacial Awareness ---\r
+
+      \  distanceTo(target) {\r
+
+      \    const head = this.head();\r
+
+      \    return Math.abs(head.x - target.x) + Math.abs(head.y - target.y);\r
+
+      \  }\r
+
+      \  \r
+
+      \  distanceToEnemy() {\r
+
+      \    const otherSnake = this.id === PLAYER_CONFIG.id ? game.enemy :
+      game.player;\r
+
+      \    if (!otherSnake?.alive) return Infinity;\r
+
+      \    return this.distanceTo(otherSnake.head());\r
+
+      \  }\r
+
+      \r
+
+      \  distanceToWall(direction) {\r
+
+      \    const { GRID } = game;\r
+
+      \    const head = this.head();\r
+
+      \    const normalizedDir = this._normalizeDirection(direction);\r
+
+      \    if (normalizedDir.x === 1) return GRID.cols - 1 - head.x;\r
+
+      \    if (normalizedDir.x === -1) return head.x;\r
+
+      \    if (normalizedDir.y === 1) return GRID.rows - 1 - head.y;\r
+
+      \    if (normalizedDir.y === -1) return head.y;\r
+
+      \    return Infinity;\r
+
+      \  }\r
+
+      \r
+
+      \  // --- Getters ---\r
+
+      \  currentDirection() { \r
+
+      \    return coordsToDirection(this.dir); \r
+
+      \  }\r
+
+      \  size() { return this.body.length; }\r
+
+      }\r
+
+      \r
+
+      // Helper function to convert direction enum to coordinate object\r
+
+      function directionToCoords(direction) {\r
+
+      \  switch (direction) {\r
+
+      \    case Direction.UP: return { x: 0, y: -1 };\r
+
+      \    case Direction.DOWN: return { x: 0, y: 1 };\r
+
+      \    case Direction.LEFT: return { x: -1, y: 0 };\r
+
+      \    case Direction.RIGHT: return { x: 1, y: 0 };\r
+
+      \    default: return { x: 0, y: 0 }; // fallback for invalid directions\r
+
+      \  }\r
+
+      }\r
+
+      \r
+
+      // Helper function to convert coordinate object to direction enum\r
+
+      function coordsToDirection(coords) {\r
+
+      \  if (coords.x === 0 && coords.y === -1) return Direction.UP;\r
+
+      \  if (coords.x === 0 && coords.y === 1) return Direction.DOWN;\r
+
+      \  if (coords.x === -1 && coords.y === 0) return Direction.LEFT;\r
+
+      \  if (coords.x === 1 && coords.y === 0) return Direction.RIGHT;\r
+
+      \  return null; // fallback for invalid coordinates\r
+
+      }"
+  - path: course1/player-ai.js
+    content: "function playerAI(enemy) {\r
+
+      \    return Direction.RIGHT;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart3/enemy-ai.js
+    content: "function enemyAI(player) { \r
+
+      \  // Strategy: Move in a square pattern\r
+
+      \  // Start by moving right, then down, then left, then up, repeating\r
+
+      \  \r
+
+      \  const head = player.head();\r
+
+      \  const gridCols = game.GRID.cols;\r
+
+      \  const gridRows = game.GRID.rows;\r
+
+      \  \r
+
+      \  let direction = player.currentDirection();\r
+
+      \  \r
+
+      \  if (head.x >= gridCols - 2 && direction !== Direction.DOWN) {\r
+
+      \    direction = Direction.DOWN;\r
+
+      \  } else if (head.y >= gridRows - 2  && direction !== Direction.LEFT) {\r
+
+      \    direction = Direction.LEFT;\r
+
+      \  }  else if (head.x <= 1  && direction !== Direction.UP) {\r
+
+      \    direction = Direction.UP;\r
+
+      \  }  else if (head.y <= 1  && direction !== Direction.RIGHT) {\r
+
+      \    direction = Direction.RIGHT;\r
+
+      \  }\r
+
+      \  \r
+
+      \  \r
+
+      \  return direction;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart3/settings.js
+    content: "// ------ Grid & Canvas ------\r
+
+      const GRID = {\r
+
+      \  cell: 20,\r
+
+      \  cols: 18,\r
+
+      \  rows: 18,\r
+
+      \  center: { x: Math.floor(18 / 2), y: Math.floor(18 / 2) }\r
+
+      };\r
+
+      \r
+
+      // ------ Game Configuration ------\r
+
+      const GAME_CONFIG = {\r
+
+      \  // Series settings\r
+
+      \  series: {\r
+
+      \    enabled: false,              // Enable/disable series mode (ignored
+      in training mode)\r
+
+      \    winsToWin: 3,               // First to X wins\r
+
+      \    resetBetweenGames: true     // Whether to reset the canvas between
+      games\r
+
+      \  },\r
+
+      \  // Training mode setting\r
+
+      \  trainingMode: true,          // Whether we're in training mode (no
+      enemy, series disabled)\r
+
+      };\r
+
+      \r
+
+      // ------ Player Configuration ------\r
+
+      const PLAYER_CONFIG = {\r
+
+      \  id: 'SnakeBot',\r
+
+      \  start: { x: 3, y: 10 },\r
+
+      \  color: '#3b82f6',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: 1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Food Configuration ------\r
+
+      const FOOD_CONFIG = {\r
+
+      \  foodCount: 1,\r
+
+      \  poisonCount: 0,\r
+
+      \  foodColor: '#22c55e',\r
+
+      \  poisonColor: '#9333ea'\r
+
+      };\r
+
+      \r
+
+      // ------ Enemy Configuration ------\r
+
+      const ENEMY_CONFIG = {\r
+
+      \  id: 'TrainingBot',\r
+
+      \  start: { x: 16, y: 10 },\r
+
+      \  color: '#03f1f9ff',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: -1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Speed Configuration ------\r
+
+      const SPEED_CONFIG = {\r
+
+      \  get playerBaseMs() { return PLAYER_CONFIG.baseMs; }, // Reference
+      player speed from PLAYER_CONFIG\r
+
+      \  get enemyBaseMs() { return ENEMY_CONFIG.baseMs; }, // Reference enemy
+      speed from ENEMY_CONFIG\r
+
+      \  minMs: 10,\r
+
+      \  maxMs: 1000,\r
+
+      \  defaultScale: 1.0\r
+
+      };\r
+
+      \r
+
+      // Make all configs globally accessible\r
+
+      window.GRID = GRID;\r
+
+      window.GAME_CONFIG = GAME_CONFIG;\r
+
+      window.PLAYER_CONFIG = PLAYER_CONFIG;\r
+
+      window.FOOD_CONFIG = FOOD_CONFIG;\r
+
+      window.ENEMY_CONFIG = ENEMY_CONFIG;\r
+
+      window.SPEED_CONFIG = SPEED_CONFIG;"
+  - path: course1/unit1/lesson1/lessonpart3/index.html
+    content: "<!DOCTYPE html>\r
+
+      <html lang=\"en\">\r
+
+      <head>\r
+
+      \  <meta charset=\"utf-8\" />\r
+
+      \  <title>Two-Snake p5.js</title>\r
+
+      \  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"
+      />\r
+
+      \  <style>\r
+
+      \    /* Keep the container small for students on small screens */\r
+
+      \    :root { color-scheme: light dark; }\r
+
+      \    body { margin: 0; font-family: system-ui, Arial, sans-serif; display:
+      grid; place-items: center; min-height: 100vh; }\r
+
+      \    .wrap { width: 95vw; max-width: 460px; margin: 0 auto; }\r
+
+      \  </style>\r
+
+      </head>\r
+
+      <body>\r
+
+      \  <div class=\"wrap\">\r
+
+      \    <main>\r
+
+      \      <!-- p5 will attach here -->\r
+
+      \      <div id=\"p5-holder\"></div>\r
+
+      \    </main>\r
+
+      \  </div>\r
+
+      \r
+
+      \  <!-- p5.js (only external dependency) -->\r
+
+      \  <script
+      src=\"https://cdn.jsdelivr.net/npm/p5@1.9.2/lib/p5.min.js\"></script>\r
+
+      \r
+
+      \  <!-- Game modules -->\r
+
+      \  <script src=\"settings.js\"></script>\r
+
+      \  <script src=\"/course1/snake.js\"></script>\r
+
+      \  <script src=\"/course1/player-ai.js\"></script>\r
+
+      \  <script src=\"enemy-ai.js\"></script>\r
+
+      \  <script src=\"/course1/game.js\"></script>\r
+
+      </body>\r
+
+      </html>\r\n"
 units:
   - unit1/index.yml
