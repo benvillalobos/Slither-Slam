@@ -3494,5 +3494,14 @@ files:
       </body>\r
 
       </html>\r\n"
+  - path: course1/unit1/lesson1/lessonpart3/prompt.md
+    content: "<!-- 🐍 COACH'S CORNER 🐍\r
+
+      \    Write clear, simple instructions for SnakeBot to follow below.\r
+
+      \    Then press the ✨ Run Prompt button in the top right of this window to
+      turn your strategy into code!\r
+
+      WRITE PROMPT BELOW ⬇️ -->\r\n"
 units:
   - unit1/index.yml
