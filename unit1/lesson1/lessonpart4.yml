@@ -52,3 +52,7 @@ questionGroups:
       - id: "1"
         type: reflection
         content: How does The Hungry Serpent beat SnakeBot?
+codePrompts:
+  - systemPrompt: "1"
+    promptFile: course1/unit1/lesson1/lessonpart4/prompt.md
+    targetCodeFile: course1/player-ai.js

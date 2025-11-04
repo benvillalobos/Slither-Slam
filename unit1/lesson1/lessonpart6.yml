@@ -50,3 +50,7 @@ questionGroups:
       - id: "1"
         type: reflection
         content: How does The Venomancer beat SnakeBot?
+codePrompts:
+  - systemPrompt: "1"
+    promptFile: course1/unit1/lesson1/lessonpart6/prompt.md
+    targetCodeFile: course1/player-ai.js
