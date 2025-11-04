@@ -127,6 +127,18 @@ systemPrompts:
       // DO NOT export anything using `module.exports`
 
       ```
+
+      **Code Output Rules**
+
+      - DO:
+        - ALWAYS output code EXACTLY as described, no extra logic
+        - Output **only code**, properly formatted in a fenced ```javascript block.  
+        - Always return a direction object at the end of the function
+        - Ensure code has comments explaining the logic, relate it to what user requested
+      - DONT:
+        - Extra commentary or markdown outside of the code block
+        - Early returns and null checks
+        - Check for poison food unless the user specifically requests it
 files:
   - path: course1/game.js
     content: "// ------ Grid & Canvas ------\r
