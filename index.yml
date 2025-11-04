@@ -3242,12 +3242,6 @@ files:
       \  return null; // fallback for invalid coordinates\r
 
       }"
-  - path: course1/player-ai.js
-    content: "function playerAI(enemy) {\r
-
-      \    return Direction.RIGHT;\r
-
-      }\r\n"
   - path: course1/unit1/lesson1/lessonpart3/enemy-ai.js
     content: "function enemyAI(player) { \r
 
@@ -3495,6 +3489,935 @@ files:
 
       </html>\r\n"
   - path: course1/unit1/lesson1/lessonpart3/prompt.md
+    content: "<!-- 🐍 COACH'S CORNER 🐍\r
+
+      \    Write clear, simple instructions for SnakeBot to follow below.\r
+
+      \    Then press the ✨ Run Prompt button in the top right of this window to
+      turn your strategy into code!\r
+
+      WRITE PROMPT BELOW ⬇️ -->\r\n"
+  - path: course1/player-ai.js
+    content: "function playerAI(enemy) {\r
+
+      \    return Direction.RIGHT;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart4/index.html
+    content: "<!DOCTYPE html>\r
+
+      <html lang=\"en\">\r
+
+      <head>\r
+
+      \  <meta charset=\"utf-8\" />\r
+
+      \  <title>Two-Snake p5.js</title>\r
+
+      \  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"
+      />\r
+
+      \  <style>\r
+
+      \    /* Keep the container small for students on small screens */\r
+
+      \    :root { color-scheme: light dark; }\r
+
+      \    body { margin: 0; font-family: system-ui, Arial, sans-serif; display:
+      grid; place-items: center; min-height: 100vh; }\r
+
+      \    .wrap { width: 95vw; max-width: 460px; margin: 0 auto; }\r
+
+      \  </style>\r
+
+      </head>\r
+
+      <body>\r
+
+      \  <div class=\"wrap\">\r
+
+      \    <main>\r
+
+      \      <!-- p5 will attach here -->\r
+
+      \      <div id=\"p5-holder\"></div>\r
+
+      \    </main>\r
+
+      \  </div>\r
+
+      \r
+
+      \  <!-- p5.js (only external dependency) -->\r
+
+      \  <script
+      src=\"https://cdn.jsdelivr.net/npm/p5@1.9.2/lib/p5.min.js\"></script>\r
+
+      \r
+
+      \  <!-- Game modules -->\r
+
+      \  <script src=\"settings.js\"></script>\r
+
+      \  <script src=\"/course1/snake.js\"></script>\r
+
+      \  <script src=\"/course1/player-ai.js\"></script>\r
+
+      \  <script src=\"enemy-ai.js\"></script>\r
+
+      \  <script src=\"/course1/game.js\"></script>\r
+
+      </body>\r
+
+      </html>\r\n"
+  - path: course1/unit1/lesson1/lessonpart4/enemy-ai.js
+    content: "function enemyAI(enemy) { \r
+
+      \  const direction = enemy.towardsClosestFood();\r
+
+      \  return direction;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart4/settings.js
+    content: "// ------ Grid & Canvas ------\r
+
+      const GRID = {\r
+
+      \  cell: 20,\r
+
+      \  cols: 18,\r
+
+      \  rows: 18,\r
+
+      \  center: { x: Math.floor(18 / 2), y: Math.floor(18 / 2) }\r
+
+      };\r
+
+      \r
+
+      // ------ Game Configuration ------\r
+
+      const GAME_CONFIG = {\r
+
+      \  // Series settings\r
+
+      \  series: {\r
+
+      \    enabled: true,              // Enable/disable series mode (ignored in
+      training mode)\r
+
+      \    winsToWin: 3,               // First to X wins\r
+
+      \    resetBetweenGames: true     // Whether to reset the canvas between
+      games\r
+
+      \  },\r
+
+      \  // Training mode setting\r
+
+      \  trainingMode: false,          // Whether we're in training mode (no
+      enemy, series disabled)\r
+
+      };\r
+
+      \r
+
+      // ------ Player Configuration ------\r
+
+      const PLAYER_CONFIG = {\r
+
+      \  id: 'SnakeBot',\r
+
+      \  start: { x: 3, y: 10 },\r
+
+      \  color: '#3b82f6',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: 1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Food Configuration ------\r
+
+      const FOOD_CONFIG = {\r
+
+      \  foodCount: 1,\r
+
+      \  poisonCount: 0,\r
+
+      \  foodColor: '#22c55e',\r
+
+      \  poisonColor: '#9333ea'\r
+
+      };\r
+
+      \r
+
+      // ------ Enemy Configuration ------\r
+
+      const ENEMY_CONFIG = {\r
+
+      \  id: 'Hungry Serpent',\r
+
+      \  start: { x: 16, y: 10 },\r
+
+      \  color: '#f0a50eff',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: -1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Speed Configuration ------\r
+
+      const SPEED_CONFIG = {\r
+
+      \  get playerBaseMs() { return PLAYER_CONFIG.baseMs; }, // Reference
+      player speed from PLAYER_CONFIG\r
+
+      \  get enemyBaseMs() { return ENEMY_CONFIG.baseMs; }, // Reference enemy
+      speed from ENEMY_CONFIG\r
+
+      \  minMs: 10,\r
+
+      \  maxMs: 1000,\r
+
+      \  defaultScale: 1.0\r
+
+      };\r
+
+      \r
+
+      // Make all configs globally accessible\r
+
+      window.GRID = GRID;\r
+
+      window.GAME_CONFIG = GAME_CONFIG;\r
+
+      window.PLAYER_CONFIG = PLAYER_CONFIG;\r
+
+      window.FOOD_CONFIG = FOOD_CONFIG;\r
+
+      window.ENEMY_CONFIG = ENEMY_CONFIG;\r
+
+      window.SPEED_CONFIG = SPEED_CONFIG;"
+  - path: course1/unit1/lesson1/lessonpart4/prompt.md
+    content: "<!-- 🐍 COACH'S CORNER 🐍\r
+
+      \    Write clear, simple instructions for SnakeBot to follow below.\r
+
+      \    Then press the ✨ Run Prompt button in the top right of this window to
+      turn your strategy into code!\r
+
+      WRITE PROMPT BELOW ⬇️ -->\r\n"
+  - path: course1/unit1/lesson1/lessonpart5/enemy-ai.js
+    content: "function enemyAI(enemy) { \r
+
+      \  // Strategy: Always attack the enemy by moving towards where the enemy
+      is going\r
+
+      \  const playerDirection = game.player.dir;\r
+
+      \  const playerHead = game.player.head();\r
+
+      \  const target = {x: playerHead.x + playerDirection.x * 2, y:
+      playerHead.y + playerDirection.y * 2};\r
+
+      \  const direction = enemy.towards(target);\r
+
+      \  return direction;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart5/settings.js
+    content: "// ------ Grid & Canvas ------\r
+
+      const GRID = {\r
+
+      \  cell: 20,\r
+
+      \  cols: 18,\r
+
+      \  rows: 18,\r
+
+      \  center: { x: Math.floor(18 / 2), y: Math.floor(18 / 2) }\r
+
+      };\r
+
+      \r
+
+      // ------ Game Configuration ------\r
+
+      const GAME_CONFIG = {\r
+
+      \  // Series settings\r
+
+      \  series: {\r
+
+      \    enabled: true,              // Enable/disable series mode (ignored in
+      training mode)\r
+
+      \    winsToWin: 3,               // First to X wins\r
+
+      \    resetBetweenGames: true     // Whether to reset the canvas between
+      games\r
+
+      \  },\r
+
+      \  // Training mode setting\r
+
+      \  trainingMode: false,          // Whether we're in training mode (no
+      enemy, series disabled)\r
+
+      };\r
+
+      \r
+
+      // ------ Player Configuration ------\r
+
+      const PLAYER_CONFIG = {\r
+
+      \  id: 'SnakeBot',\r
+
+      \  start: { x: 3, y: 10 },\r
+
+      \  color: '#3b82f6',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: 1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Food Configuration ------\r
+
+      const FOOD_CONFIG = {\r
+
+      \  foodCount: 1,\r
+
+      \  poisonCount: 0,\r
+
+      \  foodColor: '#22c55e',\r
+
+      \  poisonColor: '#9333ea'\r
+
+      };\r
+
+      \r
+
+      // ------ Enemy Configuration ------\r
+
+      const ENEMY_CONFIG = {\r
+
+      \  id: 'Bulldozer',\r
+
+      \  start: { x: 16, y: 10 },\r
+
+      \  color: '#f08605ff',\r
+
+      \  size: 6,\r
+
+      \  direction: { x: -1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Speed Configuration ------\r
+
+      const SPEED_CONFIG = {\r
+
+      \  get playerBaseMs() { return PLAYER_CONFIG.baseMs; }, // Reference
+      player speed from PLAYER_CONFIG\r
+
+      \  get enemyBaseMs() { return ENEMY_CONFIG.baseMs; }, // Reference enemy
+      speed from ENEMY_CONFIG\r
+
+      \  minMs: 10,\r
+
+      \  maxMs: 1000,\r
+
+      \  defaultScale: 1.0\r
+
+      };\r
+
+      \r
+
+      // Make all configs globally accessible\r
+
+      window.GRID = GRID;\r
+
+      window.GAME_CONFIG = GAME_CONFIG;\r
+
+      window.PLAYER_CONFIG = PLAYER_CONFIG;\r
+
+      window.FOOD_CONFIG = FOOD_CONFIG;\r
+
+      window.ENEMY_CONFIG = ENEMY_CONFIG;\r
+
+      window.SPEED_CONFIG = SPEED_CONFIG;"
+  - path: course1/unit1/lesson1/lessonpart5/prompt.md
+    content: "<!-- 🐍 COACH'S CORNER 🐍\r
+
+      \    Write clear, simple instructions for SnakeBot to follow below.\r
+
+      \    Then press the ✨ Run Prompt button in the top right of this window to
+      turn your strategy into code!\r
+
+      WRITE PROMPT BELOW ⬇️ -->\r\n"
+  - path: course1/unit1/lesson1/lessonpart6/index.html
+    content: "<!DOCTYPE html>\r
+
+      <html lang=\"en\">\r
+
+      <head>\r
+
+      \  <meta charset=\"utf-8\" />\r
+
+      \  <title>Two-Snake p5.js</title>\r
+
+      \  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"
+      />\r
+
+      \  <style>\r
+
+      \    /* Keep the container small for students on small screens */\r
+
+      \    :root { color-scheme: light dark; }\r
+
+      \    body { margin: 0; font-family: system-ui, Arial, sans-serif; display:
+      grid; place-items: center; min-height: 100vh; }\r
+
+      \    .wrap { width: 95vw; max-width: 460px; margin: 0 auto; }\r
+
+      \  </style>\r
+
+      </head>\r
+
+      <body>\r
+
+      \  <div class=\"wrap\">\r
+
+      \    <main>\r
+
+      \      <!-- p5 will attach here -->\r
+
+      \      <div id=\"p5-holder\"></div>\r
+
+      \    </main>\r
+
+      \  </div>\r
+
+      \r
+
+      \  <!-- p5.js (only external dependency) -->\r
+
+      \  <script
+      src=\"https://cdn.jsdelivr.net/npm/p5@1.9.2/lib/p5.min.js\"></script>\r
+
+      \r
+
+      \  <!-- Game modules -->\r
+
+      \  <script src=\"settings.js\"></script>\r
+
+      \  <script src=\"/course1/snake.js\"></script>\r
+
+      \  <script src=\"/course1/player-ai.js\"></script>\r
+
+      \  <script src=\"enemy-ai.js\"></script>\r
+
+      \  <script src=\"/course1/game.js\"></script>\r
+
+      </body>\r
+
+      </html>\r\n"
+  - path: course1/unit1/lesson1/lessonpart6/enemy-ai.js
+    content: "function enemyAI(enemy) { \r
+
+      \  let direction = enemy.currentDirection();\r
+
+      \r
+
+      \  const head = enemy.head();\r
+
+      \  const allFoods = game.foods;\r
+
+      \r
+
+      \  let closestSafeFood = null;\r
+
+      \  let minDistanceToSafeFood = Infinity;\r
+
+      \r
+
+      \  for (const foodItem of allFoods) {\r
+
+      \    if (foodItem.type !== 'poison') {\r
+
+      \      const distance = enemy.distanceTo(foodItem);\r
+
+      \      if (distance < minDistanceToSafeFood) {\r
+
+      \        minDistanceToSafeFood = distance;\r
+
+      \        closestSafeFood = foodItem;\r
+
+      \      }\r
+
+      \    }\r
+
+      \  }\r
+
+      \r
+
+      \  if (closestSafeFood && minDistanceToSafeFood <= 4) {\r
+
+      \    direction = enemy.towards(closestSafeFood);\r
+
+      \  } else {\r
+
+      \    direction = enemy.randomSafeDirection();\r
+
+      \  }\r
+
+      \r
+
+      \  return direction;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart6/settings.js
+    content: "// ------ Grid & Canvas ------\r
+
+      const GRID = {\r
+
+      \  cell: 20,\r
+
+      \  cols: 18,\r
+
+      \  rows: 18,\r
+
+      \  center: { x: Math.floor(18 / 2), y: Math.floor(18 / 2) }\r
+
+      };\r
+
+      \r
+
+      // ------ Game Configuration ------\r
+
+      const GAME_CONFIG = {\r
+
+      \  // Series settings\r
+
+      \  series: {\r
+
+      \    enabled: true,              // Enable/disable series mode (ignored in
+      training mode)\r
+
+      \    winsToWin: 3,               // First to X wins\r
+
+      \    resetBetweenGames: true     // Whether to reset the canvas between
+      games\r
+
+      \  },\r
+
+      \  // Training mode setting\r
+
+      \  trainingMode: false,          // Whether we're in training mode (no
+      enemy, series disabled)\r
+
+      };\r
+
+      \r
+
+      // ------ Player Configuration ------\r
+
+      const PLAYER_CONFIG = {\r
+
+      \  id: 'SnakeBot',\r
+
+      \  start: { x: 3, y: 10 },\r
+
+      \  color: '#3b82f6',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: 1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Food Configuration ------\r
+
+      const FOOD_CONFIG = {\r
+
+      \  foodCount: 1,\r
+
+      \  poisonCount: 3,\r
+
+      \  foodColor: '#22c55e',\r
+
+      \  poisonColor: '#9333ea'\r
+
+      };\r
+
+      \r
+
+      // ------ Enemy Configuration ------\r
+
+      const ENEMY_CONFIG = {\r
+
+      \  id: 'Venomancer',\r
+
+      \  start: { x: 16, y: 10 },\r
+
+      \  color: '#9333ea',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: -1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Speed Configuration ------\r
+
+      const SPEED_CONFIG = {\r
+
+      \  get playerBaseMs() { return PLAYER_CONFIG.baseMs; }, // Reference
+      player speed from PLAYER_CONFIG\r
+
+      \  get enemyBaseMs() { return ENEMY_CONFIG.baseMs; }, // Reference enemy
+      speed from ENEMY_CONFIG\r
+
+      \  minMs: 10,\r
+
+      \  maxMs: 1000,\r
+
+      \  defaultScale: 1.0\r
+
+      };\r
+
+      \r
+
+      // Make all configs globally accessible\r
+
+      window.GRID = GRID;\r
+
+      window.GAME_CONFIG = GAME_CONFIG;\r
+
+      window.PLAYER_CONFIG = PLAYER_CONFIG;\r
+
+      window.FOOD_CONFIG = FOOD_CONFIG;\r
+
+      window.ENEMY_CONFIG = ENEMY_CONFIG;\r
+
+      window.SPEED_CONFIG = SPEED_CONFIG;"
+  - path: course1/unit1/lesson1/lessonpart6/prompt.md
+    content: "<!-- 🐍 COACH'S CORNER 🐍\r
+
+      \    Write clear, simple instructions for SnakeBot to follow below.\r
+
+      \    Then press the ✨ Run Prompt button in the top right of this window to
+      turn your strategy into code!\r
+
+      WRITE PROMPT BELOW ⬇️ -->\r\n"
+  - path: course1/unit1/lesson1/lessonpart7/index.html
+    content: "<!DOCTYPE html>\r
+
+      <html lang=\"en\">\r
+
+      <head>\r
+
+      \  <meta charset=\"utf-8\" />\r
+
+      \  <title>Two-Snake p5.js</title>\r
+
+      \  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"
+      />\r
+
+      \  <style>\r
+
+      \    /* Keep the container small for students on small screens */\r
+
+      \    :root { color-scheme: light dark; }\r
+
+      \    body { margin: 0; font-family: system-ui, Arial, sans-serif; display:
+      grid; place-items: center; min-height: 100vh; }\r
+
+      \    .wrap { width: 95vw; max-width: 460px; margin: 0 auto; }\r
+
+      \  </style>\r
+
+      </head>\r
+
+      <body>\r
+
+      \  <div class=\"wrap\">\r
+
+      \    <main>\r
+
+      \      <!-- p5 will attach here -->\r
+
+      \      <div id=\"p5-holder\"></div>\r
+
+      \    </main>\r
+
+      \  </div>\r
+
+      \r
+
+      \  <!-- p5.js (only external dependency) -->\r
+
+      \  <script
+      src=\"https://cdn.jsdelivr.net/npm/p5@1.9.2/lib/p5.min.js\"></script>\r
+
+      \r
+
+      \  <!-- Game modules -->\r
+
+      \  <script src=\"settings.js\"></script>\r
+
+      \  <script src=\"/course1/snake.js\"></script>\r
+
+      \  <script src=\"/course1/player-ai.js\"></script>\r
+
+      \  <script src=\"enemy-ai.js\"></script>\r
+
+      \  <script src=\"/course1/game.js\"></script>\r
+
+      </body>\r
+
+      </html>\r\n"
+  - path: course1/unit1/lesson1/lessonpart7/enemy-ai.js
+    content: "function enemyAI(enemy) {\r
+
+      \  // Strategy: Rotate randomly between multiple strategies every N
+      ticks\r
+
+      \  const TICKS_PER_STRATEGY = 100; // configurable tick duration\r
+
+      \  if (!enemy.strategyTick) {\r
+
+      \    enemy.strategyTick = 0;\r
+
+      \    enemy.currentStrategy = 0;\r
+
+      \  }\r
+
+      \r
+
+      \  enemy.strategyTick++;\r
+
+      \r
+
+      \  // Change strategy after TICKS_PER_STRATEGY\r
+
+      \  if (enemy.strategyTick >= TICKS_PER_STRATEGY) {\r
+
+      \    enemy.strategyTick = 0;\r
+
+      \    // Randomly pick one of the strategies (0 = chase food, 1 = chase
+      enemy, 2 = random)\r
+
+      \    enemy.currentStrategy = Math.floor(Math.random() * 3);\r
+
+      \  }\r
+
+      \r
+
+      \  let direction = enemy.currentDirection();\r
+
+      \r
+
+      \  // Strategy 0: Chase after closest food\r
+
+      \  if (enemy.currentStrategy === 0) {\r
+
+      \    direction = enemy.towardsClosestFood();\r
+
+      \  }\r
+
+      \r
+
+      \  // Strategy 1: Chase after the enemy\r
+
+      \  if (enemy.currentStrategy === 1) {\r
+
+      \    direction = enemy.towardsEnemy();\r
+
+      \  }\r
+
+      \r
+
+      \  // Strategy 2: Move randomly in a safe direction\r
+
+      \  if (enemy.currentStrategy === 2) {\r
+
+      \    direction = enemy.randomSafeDirection();\r
+
+      \  }\r
+
+      \r
+
+      \  return direction;\r
+
+      }\r\n"
+  - path: course1/unit1/lesson1/lessonpart7/settings.js
+    content: "// ------ Grid & Canvas ------\r
+
+      const GRID = {\r
+
+      \  cell: 20,\r
+
+      \  cols: 18,\r
+
+      \  rows: 18,\r
+
+      \  center: { x: Math.floor(18 / 2), y: Math.floor(18 / 2) }\r
+
+      };\r
+
+      \r
+
+      // ------ Game Configuration ------\r
+
+      const GAME_CONFIG = {\r
+
+      \  // Series settings\r
+
+      \  series: {\r
+
+      \    enabled: true,              // Enable/disable series mode (ignored in
+      training mode)\r
+
+      \    winsToWin: 3,               // First to X wins\r
+
+      \    resetBetweenGames: true     // Whether to reset the canvas between
+      games\r
+
+      \  },\r
+
+      \  // Training mode setting\r
+
+      \  trainingMode: false,          // Whether we're in training mode (no
+      enemy, series disabled)\r
+
+      };\r
+
+      \r
+
+      // ------ Player Configuration ------\r
+
+      const PLAYER_CONFIG = {\r
+
+      \  id: 'SnakeBot',\r
+
+      \  start: { x: 3, y: 10 },\r
+
+      \  color: '#3b82f6',\r
+
+      \  size: 3,\r
+
+      \  direction: { x: 1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Food Configuration ------\r
+
+      const FOOD_CONFIG = {\r
+
+      \  foodCount: 1,\r
+
+      \  poisonCount: 0,\r
+
+      \  foodColor: '#22c55e',\r
+
+      \  poisonColor: '#9333ea'\r
+
+      };\r
+
+      \r
+
+      // ------ Enemy Configuration ------\r
+
+      const ENEMY_CONFIG = {\r
+
+      \  id: 'Serpent Supreme',\r
+
+      \  start: { x: 16, y: 10 },\r
+
+      \  color: '#9333ea',\r
+
+      \  size: 6,\r
+
+      \  direction: { x: -1, y: 0 },\r
+
+      \  baseMs: 200\r
+
+      };\r
+
+      \r
+
+      // ------ Speed Configuration ------\r
+
+      const SPEED_CONFIG = {\r
+
+      \  get playerBaseMs() { return PLAYER_CONFIG.baseMs; }, // Reference
+      player speed from PLAYER_CONFIG\r
+
+      \  get enemyBaseMs() { return ENEMY_CONFIG.baseMs; }, // Reference enemy
+      speed from ENEMY_CONFIG\r
+
+      \  minMs: 10,\r
+
+      \  maxMs: 1000,\r
+
+      \  defaultScale: 1.0\r
+
+      };\r
+
+      \r
+
+      // Make all configs globally accessible\r
+
+      window.GRID = GRID;\r
+
+      window.GAME_CONFIG = GAME_CONFIG;\r
+
+      window.PLAYER_CONFIG = PLAYER_CONFIG;\r
+
+      window.FOOD_CONFIG = FOOD_CONFIG;\r
+
+      window.ENEMY_CONFIG = ENEMY_CONFIG;\r
+
+      window.SPEED_CONFIG = SPEED_CONFIG;"
+  - path: course1/unit1/lesson1/lessonpart7/prompt.md
     content: "<!-- 🐍 COACH'S CORNER 🐍\r
 
       \    Write clear, simple instructions for SnakeBot to follow below.\r

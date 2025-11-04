@@ -24,6 +24,21 @@ content: |+
   > Prompt Challenge Instructions
   > Start by testing your current strategy against your opponent. Click the ✨ button to generate code and see your strategy in action!. If the strategy doesn't work, modify your prompt in the `prompt.md` file. You’ll see the generated code appear in the `player-ai.js` file.
 
+showEditor: true
+editors:
+  - course1/game.js
+  - course1/snake.js
+  - course1/unit1/lesson1/lessonpart6/index.html
+  - course1/unit1/lesson1/lessonpart6/enemy-ai.js
+  - course1/unit1/lesson1/lessonpart6/settings.js
+  - course1/unit1/lesson1/lessonpart6/prompt.md
+  - course1/player-ai.js
+hiddenEditors:
+  - course1/game.js
+  - course1/snake.js
+  - course1/unit1/lesson1/lessonpart6/enemy-ai.js
+  - course1/unit1/lesson1/lessonpart6/settings.js
+  - course1/unit1/lesson1/lessonpart6/index.html
 questionGroups:
   - id: "1"
     questions:
