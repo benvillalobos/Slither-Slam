@@ -36,9 +36,9 @@ editors:
 hiddenEditors:
   - course1/game.js
   - course1/snake.js
+  - course1/unit1/lesson1/lessonpart6/index.html
   - course1/unit1/lesson1/lessonpart6/enemy-ai.js
   - course1/unit1/lesson1/lessonpart6/settings.js
-  - course1/unit1/lesson1/lessonpart6/index.html
 questionGroups:
   - id: "1"
     questions:
